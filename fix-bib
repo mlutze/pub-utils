@@ -50,7 +50,6 @@ def clean_doi(string: str):
         return cleaned
     else:
         return None
-
 class FilterUsedTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
     def __init__(self, root):
         self._tex_files = get_tex_files(root)
@@ -171,7 +170,7 @@ def main():
 
     middleware = [
         FilterUsedTransformer("."),
-        LookupDoiTransformer(),
+        LookupDoiTransformer(interactive=args.interactive),
         FilterOrderFieldTransformer(FIELD_MAP)
         
     ]
