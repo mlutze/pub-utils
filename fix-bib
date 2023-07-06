@@ -157,6 +157,8 @@ def main():
     )
     parser.add_argument("bib_file")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+    parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
+    # TODO -r is always on
 
     args = parser.parse_args()
 
