@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+
+from typing import Collection
+import bibtexparser
+from bibtexparser.library import Library
+import bibtexparser.middlewares
+import bibtexparser.middlewares.middleware
+
+import webbrowser
+import shutil
+
+from habanero import cn
+
+import sys
+import os
+
+from bibtexparser.model import Block, Entry, Field
+
+FIELD_MAP = {
+    "article": ["title", "author", "journal", "volume", "number", "year", "doi"],
+    "phdthesis": ["title", "author", "year", "school", "doi"],
+    "inproceedings": ["title", "author", "booktitle", "year", "doi"],
+    "techreport": ["title", "author", "institution", "year", "doi"],
+    "book": ["title", "author", "volume", "year", "publisher", "doi"],
+    "incollection": ["title", "author", "booktitle", "year", "doi"]
+}
+
+def get_tex_files(root):
+    files = []
+    for (dir_name, _, file_names) in os.walk(root):
+        for file_name in file_names:
+            if file_name.endswith(".tex"):
+                files.append(os.path.join(dir_name, file_name))
+            else:
+                pass
+    return files
+
+def file_contains(file_name, string):
+    with open(file_name) as file:
+        for line in file:
+            if string in line:
+                return True
+        else:
+            return False
+
+def clean_doi(string: str):
+    cleaned = string.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/").removeprefix("doi.org/")
+    if cleaned.startswith("10."):
+        return cleaned
+    else:
+        return None
+
+class FilterUsedTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
+    def __init__(self, root):
+        self._tex_files = get_tex_files(root)
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "FilterUsedTransformer"
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+        if any(file_contains(file_name, entry.key) for file_name in self._tex_files):
+            return entry
+        else:
+            return None
+
+class FilterOrderFieldTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
+    def __init__(self, map):
+        self._map = map
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "FilterOrderFieldTransformer"
+
+    # TODO this is a bug. should report to library authors
+    def transform(self, library: "Library") -> "Library":
+        blocks = []
+        for b in library.blocks:
+            block = self.transform_block(b, library)
+            if block is None:
+                pass
+            else:
+                blocks.append(block)
+        return Library(blocks=blocks)
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+        keys = self._map.get(entry.entry_type, None)
+        if keys is None:
+            print("unknown entry type: " + entry.entry_type)
+            print("fields unmodified")
+            return entry
+        else:
+            def get_field(key):
+                if key in entry.fields_dict:
+                    return Field(key, entry.fields_dict[key].value)
+                else:
+                    print("entry " + entry.key + " missing key: " + key)
+                    return Field(key, "TODO")
+            fields = [get_field(key) for key in keys]
+            return Entry(entry.entry_type, entry.key, fields)
+
+class LookupDoiTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "LookupDoiTransformer"
+
+    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+        doi = entry.fields_dict.get("doi", None)
+        if doi is None:
+            print("entry " + entry.key + " missing DOI")
+            title = entry.fields_dict.get("title", None)
+            if title is None:
+                print("entry " + entry.key + " missing Title")
+                print("nothing I can do...")
+                return entry
+            else:
+                print("Let me Google that for you...")
+                webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
+                raw_doi = input("Enter the DOI or leave blank to skip: ")
+                if raw_doi.strip() == "":
+                    print("skipping DOI")
+                    return entry
+                else:
+                    while True:
+                        doi_string = clean_doi(raw_doi)
+                        if doi_string is None:
+                            print("Invalid DOI.")
+                            raw_doi = input("Enter the DOI or leave blank to skip: ")
+                            if raw_doi.strip() == "":
+                                print("skipping DOI")
+                                return entry
+                            else:
+                                pass
+                        else:
+                            break
+        else:
+            doi_string = doi.value
+
+        crossref_bibtex = cn.content_negotiation(doi_string)
+        if crossref_bibtex is None:
+            print("No object found matching DOI.")
+            return entry
+        crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
+        return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
+
+
+
+bib_file_name = sys.argv[1]
+backup_file_name = bib_file_name + ".bak"
+shutil.copyfile(bib_file_name, backup_file_name)
+
+
+db = bibtexparser.parse_file(bib_file_name)
+
+middleware = [
+    FilterUsedTransformer("."),
+    LookupDoiTransformer(),
+    FilterOrderFieldTransformer(FIELD_MAP)
+    
+]
+bibtexparser.write_file(bib_file_name, library=db, append_middleware=middleware)
