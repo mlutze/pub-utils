@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-
 from typing import Collection
+import argparse
+import os
+import shutil
+import webbrowser
+
+
 import bibtexparser
 from bibtexparser.library import Library
 import bibtexparser.middlewares
 import bibtexparser.middlewares.middleware
-
-import webbrowser
-import shutil
+from bibtexparser.model import Block, Entry, Field
 
 from habanero import cn
 
-import sys
-import os
-
-from bibtexparser.model import Block, Entry, Field
+def log(string):
+    print(string)
 
 FIELD_MAP = {
     "article": ["title", "author", "journal", "volume", "number", "year", "doi"],
@@ -63,6 +64,7 @@ class FilterUsedTransformer(bibtexparser.middlewares.middleware.BlockMiddleware)
         if any(file_contains(file_name, entry.key) for file_name in self._tex_files):
             return entry
         else:
+            log("Removing unused entry: " + entry.key)
             return None
 
 class FilterOrderFieldTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
@@ -88,21 +90,21 @@ class FilterOrderFieldTransformer(bibtexparser.middlewares.middleware.BlockMiddl
     def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
         keys = self._map.get(entry.entry_type, None)
         if keys is None:
-            print("unknown entry type: " + entry.entry_type)
-            print("fields unmodified")
+            log("Not modifying unknown entry type: " + entry.entry_type)
             return entry
         else:
             def get_field(key):
                 if key in entry.fields_dict:
                     return Field(key, entry.fields_dict[key].value)
                 else:
-                    print("entry " + entry.key + " missing key: " + key)
+                    log("Marking missing key '" + key + "' for entry: " + entry.key)
                     return Field(key, "TODO")
             fields = [get_field(key) for key in keys]
             return Entry(entry.entry_type, entry.key, fields)
 
 class LookupDoiTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
-    def __init__(self):
+    def __init__(self, interactive: bool):
+        self._interactive = interactive
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -114,53 +116,66 @@ class LookupDoiTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
         if doi is None:
             print("entry " + entry.key + " missing DOI")
             title = entry.fields_dict.get("title", None)
-            if title is None:
-                print("entry " + entry.key + " missing Title")
-                print("nothing I can do...")
-                return entry
-            else:
-                print("Let me Google that for you...")
-                webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
-                raw_doi = input("Enter the DOI or leave blank to skip: ")
-                if raw_doi.strip() == "":
-                    print("skipping DOI")
+            if self._interactive:
+                if title is None:
+                    print("Cannot look up DOI for titleless entry: " + entry.key)
                     return entry
                 else:
-                    while True:
-                        doi_string = clean_doi(raw_doi)
-                        if doi_string is None:
-                            print("Invalid DOI.")
-                            raw_doi = input("Enter the DOI or leave blank to skip: ")
-                            if raw_doi.strip() == "":
-                                print("skipping DOI")
-                                return entry
+                    print("Let me Google that for you...")
+                    webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
+                    raw_doi = input("Enter the DOI or leave blank to skip: ")
+                    if raw_doi.strip() == "":
+                        print("Skipping DOI")
+                        return entry
+                    else:
+                        while True:
+                            doi_string = clean_doi(raw_doi)
+                            if doi_string is None:
+                                print("Invalid DOI.")
+                                raw_doi = input("Enter the DOI or leave blank to skip: ")
+                                if raw_doi.strip() == "":
+                                    print("Skipping DOI")
+                                    return entry
+                                else:
+                                    pass
                             else:
-                                pass
-                        else:
-                            break
+                                break
+            else:
+                return entry
         else:
             doi_string = doi.value
 
         crossref_bibtex = cn.content_negotiation(doi_string)
         if crossref_bibtex is None:
-            print("No object found matching DOI.")
+            log("Not modifying entry with invalid doi:" + entry.key)
             return entry
         crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
         return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
 
+def main():
+    parser = argparse.ArgumentParser(
+        description="Clean up a BibTeX file according to Flix contributor conventions."
+    )
+    parser.add_argument("bib_file")
+    parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+
+    args = parser.parse_args()
+
+    bib_file_name = args.bib_file
+
+    backup_file_name = bib_file_name + ".bak"
+    shutil.copyfile(bib_file_name, backup_file_name)
 
 
-bib_file_name = sys.argv[1]
-backup_file_name = bib_file_name + ".bak"
-shutil.copyfile(bib_file_name, backup_file_name)
+    db = bibtexparser.parse_file(bib_file_name)
 
+    middleware = [
+        FilterUsedTransformer("."),
+        LookupDoiTransformer(),
+        FilterOrderFieldTransformer(FIELD_MAP)
+        
+    ]
+    bibtexparser.write_file(bib_file_name, library=db, append_middleware=middleware)
 
-db = bibtexparser.parse_file(bib_file_name)
-
-middleware = [
-    FilterUsedTransformer("."),
-    LookupDoiTransformer(),
-    FilterOrderFieldTransformer(FIELD_MAP)
-    
-]
-bibtexparser.write_file(bib_file_name, library=db, append_middleware=middleware)
+if __name__ == "__main__":
+    main()
