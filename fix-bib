@@ -53,16 +53,37 @@ def clean_doi(string: str):
         return None
 
 def titlecase_name(name: NameParts):
-    def mapNone(f, x):
-        if x is None:
-            return None
+    def capitalize_mc(name: str):
+        lower_name = name.lower()
+        prefixes = ["mc"]
+        for prefix in prefixes:
+            if lower_name.startswith(prefix):
+                return prefix.capitalize() + lower_name.removeprefix(prefix).capitalize()
         else:
-            return f(x)
+            return name.capitalize()
+
+    def capitalize(n: str):
+        parts = n.split("-")
+        new_parts = [capitalize_mc(part) for part in parts]
+        return "-".join(new_parts)
+    
+    def mapNone(f):
+        def fNone(x):
+            if x is None:
+                return None
+            else:
+                return f(x)
+        return fNone
+    
+    def mapList(f):
+        def fList(l):
+            return [f(x) for x in l]
+        return fList
 
     return NameParts(
-        first=mapNone(str.capitalize, name.first),
-        von=mapNone(str.lower, name.von),
-        last=mapNone(str.capitalize, name.last),
+        first=mapNone(mapList(capitalize))(name.first),
+        von=mapNone(mapList(str.lower))(name.von),
+        last=mapNone(mapList(capitalize))(name.last),
         jr=name.jr # TODO too dangerous. leaving as-is
     )
 
