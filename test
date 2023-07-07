@@ -15,3 +15,7 @@ diff $tmpfile "test-resources/expected/$name.bib"
 name="test-lookup-1"
 ./fix-bib -l -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
+
+name="test-lookup-2"
+./fix-bib -l -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
