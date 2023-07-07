@@ -4,9 +4,19 @@ set -e
 
 tmpfile=$(mktemp)
 
-name="test-idempotent"
+name="test-noargs-1"
 echo "Testing $name"
 ./fix-bib -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
+
+name="test-noargs-2"
+echo "Testing $name"
+./fix-bib -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
+
+name="test-todo-1"
+echo "Testing $name"
+./fix-bib -t -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
 
 name="test-names-1"
