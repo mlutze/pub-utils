@@ -4,9 +4,14 @@ set -e
 
 tmpfile=$(mktemp)
 
-./fix-bib -o $tmpfile ./test-resources/test-idempotent.bib
-diff $tmpfile test-resources/expected.bib
+name="test-idempotent"
+./fix-bib -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
 
-./fix-bib -n -o $tmpfile ./test-resources/test-names-1.bib
-diff $tmpfile test-resources/expected.bib
+name="test-names-1"
+./fix-bib -n -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
 
+name="test-lookup-1"
+./fix-bib -l -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"

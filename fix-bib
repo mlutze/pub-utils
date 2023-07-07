@@ -259,6 +259,7 @@ def main():
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
+    parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
     parser.add_argument("-u", "--unused", action="store_true", help="remove unused entries")
@@ -280,8 +281,10 @@ def main():
     middleware = []
     if args.unused:
         middleware.append(FilterUsedTransformer("."))
-    if args.replace:
-        middleware.append(LookupDoiTransformer(interactive=args.interactive))
+    if args.interactive:
+        middleware.append(LookupDoiTransformer())
+    if args.lookup:
+        middleware.append(LookupCitationTransformer(clobber=args.replace))
     middleware.append(FilterOrderFieldTransformer(FIELD_MAP, todo=args.todo))
     if args.names:
         middleware.append(SeparateCoAuthors())
