@@ -5,17 +5,31 @@ set -e
 tmpfile=$(mktemp)
 
 name="test-idempotent"
+echo "Testing $name"
 ./fix-bib -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
 
 name="test-names-1"
+echo "Testing $name"
 ./fix-bib -n -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
 
 name="test-lookup-1"
+echo "Testing $name"
 ./fix-bib -l -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
 
 name="test-lookup-2"
+echo "Testing $name"
 ./fix-bib -l -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
+
+name="test-replace-1"
+echo "Testing $name"
+./fix-bib -lr -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
+
+name="test-replace-2"
+echo "Testing $name"
+./fix-bib -lr -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
