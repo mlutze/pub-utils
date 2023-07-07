@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Optional
+from typing import Any, Optional
 import argparse
 import os
 import shutil
@@ -96,6 +96,16 @@ def titlecase_name(name: NameParts) -> NameParts:
         jr=name.jr # TODO too dangerous. leaving as-is
     )
 
+def set_field(entry: Entry, key: str, value: Any) -> Entry:
+    new_fields_dict = entry.fields_dict.copy()
+    new_fields_dict[key] = Field(key, value)
+    new_fields = list(new_fields_dict.keys())
+    return Entry(
+        entry_type=entry.entry_type,
+        key=entry.key,
+        fields=new_fields
+    )
+
 class FormatNamesTransformer(BlockMiddleware):
     def __init__(self):
         self._allow_inplace_modification = True
@@ -113,14 +123,7 @@ class FormatNamesTransformer(BlockMiddleware):
             new_author_list = [titlecase_name(author) for author in author_list]
             if author_list != new_author_list:
                 log("Modified author formatting for entry: " + entry.key)
-            new_fields_dict = entry.fields_dict.copy()
-            new_fields_dict["author"] = Field("author", new_author_list)
-            new_fields_list = [new_fields_dict[key] for key in new_fields_dict]
-            return Entry(
-                entry_type=entry.entry_type,
-                key=entry.key,
-                fields=new_fields_list
-            )
+            return set_field(entry, "author", new_author_list)
 
 class FilterUsedTransformer(BlockMiddleware):
     def __init__(self, root):
@@ -179,54 +182,65 @@ class FilterOrderFieldTransformer(BlockMiddleware):
             return Entry(entry.entry_type, entry.key, fields)
 
 class LookupDoiTransformer(BlockMiddleware):
-    def __init__(self, *, interactive: bool):
-        self._interactive = interactive
+    def __init__(self):
         self._allow_inplace_modification = True
-
+    
     @staticmethod
     def metadata_key():
         return "LookupDoiTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         doi = entry.fields_dict.get("doi", None)
-        if doi is None:
-            print("entry " + entry.key + " missing DOI")
+        if doi is not None:
+            return entry
+        else:
+            print("Entry missing DOI: " + entry.key)
             title = entry.fields_dict.get("title", None)
-            if self._interactive:
-                if title is None:
-                    print("Cannot look up DOI for titleless entry: " + entry.key)
+            if title is None:
+                print("Cannot look up DOI for titleless entry: " + entry.key)
+                return entry
+            else:
+                print("Let me Google that for you...")
+                webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
+                raw_doi = input("Enter the DOI or leave blank to skip: ")
+                if raw_doi.strip() == "":
+                    print("Skipping DOI")
                     return entry
                 else:
-                    print("Let me Google that for you...")
-                    webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
-                    raw_doi = input("Enter the DOI or leave blank to skip: ")
-                    if raw_doi.strip() == "":
-                        print("Skipping DOI")
-                        return entry
-                    else:
-                        while True:
-                            doi_string = clean_doi(raw_doi)
-                            if doi_string is None:
-                                print("Invalid DOI.")
-                                raw_doi = input("Enter the DOI or leave blank to skip: ")
-                                if raw_doi.strip() == "":
-                                    print("Skipping DOI")
-                                    return entry
-                                else:
-                                    pass
+                    while True:
+                        doi_string = clean_doi(raw_doi)
+                        if doi_string is None:
+                            print("Invalid DOI.")
+                            raw_doi = input("Enter the DOI or leave blank to skip: ")
+                            if raw_doi.strip() == "":
+                                print("Skipping DOI")
+                                return entry
                             else:
-                                break
-            else:
-                return entry
-        else:
-            doi_string = doi.value
+                                pass
+                        else:
+                            break
+                    return set_field(entry, "doi", doi_string)
 
-        crossref_bibtex = cn.content_negotiation(doi_string)
-        if crossref_bibtex is None:
-            log("Not modifying entry with invalid doi:" + entry.key)
+class LookupCitationTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "LookupFieldsTransformer"
+
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
+        doi = entry.fields_dict.get("doi", None)
+        if doi is None:
+            log("Cannot look up citation for DOIless entry: " + entry.key)
             return entry
-        crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
-        return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
+        else:
+            crossref_bibtex = cn.content_negotiation(doi.value)
+            if crossref_bibtex is None:
+                log("Not modifying entry with invalid doi:" + entry.key)
+                return entry
+            crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
+            return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
 
 def main():
     parser = argparse.ArgumentParser(
