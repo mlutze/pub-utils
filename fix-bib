@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Collection
+from typing import Optional
 import argparse
 import os
 import shutil
@@ -16,6 +16,7 @@ from bibtexparser.middlewares.names import SeparateCoAuthors, SplitNameParts, Me
 from habanero import cn
 
 def log(string):
+    """Logs the string to the appropriate stream."""
     print(string)
 
 FIELD_MAP = {
@@ -27,8 +28,9 @@ FIELD_MAP = {
     "incollection": ["title", "author", "booktitle", "year", "doi"]
 }
 
-def get_tex_files(root):
-    files = []
+def get_tex_files(root: str) -> list[str]:
+    """Returns the list of TeX files under the given root directory."""
+    files: list[str] = []
     for (dir_name, _, file_names) in os.walk(root):
         for file_name in file_names:
             if file_name.endswith(".tex"):
@@ -37,7 +39,8 @@ def get_tex_files(root):
                 pass
     return files
 
-def file_contains(file_name, string):
+def file_contains(file_name: str, string: str) -> bool:
+    """Returns true if the given file contains the given string."""
     with open(file_name) as file:
         for line in file:
             if string in line:
@@ -45,15 +48,20 @@ def file_contains(file_name, string):
         else:
             return False
 
-def clean_doi(string: str):
+def clean_doi(string: str) -> Optional[str]:
+    """Removes any link information from the DOI string. Returns None if the string does not appear to represent a DOI.
+    """
     cleaned = string.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/").removeprefix("doi.org/")
     if cleaned.startswith("10."):
         return cleaned
     else:
         return None
 
-def titlecase_name(name: NameParts):
-    def capitalize_mc(name: str):
+def titlecase_name(name: NameParts) -> NameParts:
+    """Converts the name parts to titlecase."""
+
+    def capitalize_mc(name: str) -> str:
+        """Capitalizes the name, accounting for prefixes suchas 'Mc'."""
         lower_name = name.lower()
         prefixes = ["mc"]
         for prefix in prefixes:
@@ -62,7 +70,8 @@ def titlecase_name(name: NameParts):
         else:
             return name.capitalize()
 
-    def capitalize(n: str):
+    def capitalize(n: str) -> str:
+        """Capitalizes the name, accounting for hyphenation."""
         parts = n.split("-")
         new_parts = [capitalize_mc(part) for part in parts]
         return "-".join(new_parts)
@@ -95,7 +104,7 @@ class FormatNamesTransformer(BlockMiddleware):
     def metadata_key():
         return "FormatNamesTransformer"
 
-    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
         author_field = entry.fields_dict.get("author", None)
         if author_field is None:
             return entry
@@ -122,7 +131,7 @@ class FilterUsedTransformer(BlockMiddleware):
     def metadata_key():
         return "FilterUsedTransformer"
     
-    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+    def transform_entry(self, entry: Entry, library: Library) -> Block | None:
         if any(file_contains(file_name, entry.key) for file_name in self._tex_files):
             return entry
         else:
@@ -150,7 +159,7 @@ class FilterOrderFieldTransformer(BlockMiddleware):
                 blocks.append(block)
         return Library(blocks=blocks)
     
-    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
         keys = self._map.get(entry.entry_type, None)
         if keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
@@ -178,7 +187,7 @@ class LookupDoiTransformer(BlockMiddleware):
     def metadata_key():
         return "LookupDoiTransformer"
 
-    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
         doi = entry.fields_dict.get("doi", None)
         if doi is None:
             print("entry " + entry.key + " missing DOI")
