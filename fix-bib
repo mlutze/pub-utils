@@ -222,7 +222,8 @@ class LookupDoiTransformer(BlockMiddleware):
                     return set_field(entry, "doi", doi_string)
 
 class LookupCitationTransformer(BlockMiddleware):
-    def __init__(self):
+    def __init__(self, *, clobber: bool):
+        self._clobber = clobber
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -240,7 +241,15 @@ class LookupCitationTransformer(BlockMiddleware):
                 log("Not modifying entry with invalid doi:" + entry.key)
                 return entry
             crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
-            return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
+            if self._clobber:
+                return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
+            else:
+                new_fields = entry.fields_dict.copy()
+                crossref_fields = crossref_entry.fields_dict
+                for field in crossref_fields:
+                    if field not in new_fields:
+                        new_fields[field] = crossref_fields[field]
+                return Entry(entry.entry_type, key=entry.key, fields = list(new_fields.keys()))
 
 def main():
     parser = argparse.ArgumentParser(
@@ -248,17 +257,22 @@ def main():
     )
     parser.add_argument("bib_file")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+    parser.add_argument("-n", "--names", action="store_true", help="format author names")
+    parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
     parser.add_argument("-u", "--unused", action="store_true", help="remove unused entries")
-    parser.add_argument("-n", "--names", action="store_true", help="format author names")
 
     args = parser.parse_args()
 
     bib_file_name = args.bib_file
 
-    backup_file_name = bib_file_name + ".bak"
-    shutil.copyfile(bib_file_name, backup_file_name)
+    if args.output is None:
+        backup_file_name = bib_file_name + ".bak"
+        shutil.copyfile(bib_file_name, backup_file_name)
+        out_file = bib_file_name
+    else:
+        out_file = args.output
 
 
     db = bibtexparser.parse_file(bib_file_name)
@@ -276,7 +290,7 @@ def main():
         middleware.append(MergeNameParts())
         middleware.append(MergeCoAuthors())
 
-    bibtexparser.write_file(bib_file_name, library=db, append_middleware=middleware)
+    bibtexparser.write_file(out_file, library=db, append_middleware=middleware)
 
 if __name__ == "__main__":
     main()
