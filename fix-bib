@@ -8,9 +8,10 @@ import webbrowser
 
 import bibtexparser
 from bibtexparser.library import Library
-import bibtexparser.middlewares
-import bibtexparser.middlewares.middleware
+from bibtexparser.middlewares.middleware import BlockMiddleware
 from bibtexparser.model import Block, Entry, Field
+from bibtexparser.middlewares.names import NameParts
+from bibtexparser.middlewares.names import SeparateCoAuthors, SplitNameParts, MergeCoAuthors, MergeNameParts
 
 from habanero import cn
 
@@ -50,7 +51,48 @@ def clean_doi(string: str):
         return cleaned
     else:
         return None
-class FilterUsedTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
+
+def titlecase_name(name: NameParts):
+    def mapNone(f, x):
+        if x is None:
+            return None
+        else:
+            return f(x)
+
+    return NameParts(
+        first=mapNone(str.capitalize, name.first),
+        von=mapNone(str.lower, name.von),
+        last=mapNone(str.capitalize, name.last),
+        jr=name.jr # TODO too dangerous. leaving as-is
+    )
+
+class FormatNamesTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "FormatNamesTransformer"
+
+    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+        author_field = entry.fields_dict.get("author", None)
+        if author_field is None:
+            return entry
+        else:
+            author_list = author_field.value
+            new_author_list = [titlecase_name(author) for author in author_list]
+            if author_list != new_author_list:
+                log("Modified author formatting for entry: " + entry.key)
+            new_fields_dict = entry.fields_dict.copy()
+            new_fields_dict["author"] = Field("author", new_author_list)
+            new_fields_list = [new_fields_dict[key] for key in new_fields_dict]
+            return Entry(
+                entry_type=entry.entry_type,
+                key=entry.key,
+                fields=new_fields_list
+            )
+
+class FilterUsedTransformer(BlockMiddleware):
     def __init__(self, root):
         self._tex_files = get_tex_files(root)
         self._allow_inplace_modification = True
@@ -66,9 +108,10 @@ class FilterUsedTransformer(bibtexparser.middlewares.middleware.BlockMiddleware)
             log("Removing unused entry: " + entry.key)
             return None
 
-class FilterOrderFieldTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
-    def __init__(self, map):
+class FilterOrderFieldTransformer(BlockMiddleware):
+    def __init__(self, map, *, todo):
         self._map = map
+        self._todo = todo
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -96,13 +139,17 @@ class FilterOrderFieldTransformer(bibtexparser.middlewares.middleware.BlockMiddl
                 if key in entry.fields_dict:
                     return Field(key, entry.fields_dict[key].value)
                 else:
-                    log("Marking missing key '" + key + "' for entry: " + entry.key)
-                    return Field(key, "TODO")
+                    log("Missing key '" + key + "' for entry: " + entry.key)
+                    if self._todo:
+                        return Field(key, "TODO")
+                    else:
+                        return None
             fields = [get_field(key) for key in keys]
+            fields = [f for f in fields if f is not None]
             return Entry(entry.entry_type, entry.key, fields)
 
-class LookupDoiTransformer(bibtexparser.middlewares.middleware.BlockMiddleware):
-    def __init__(self, interactive: bool):
+class LookupDoiTransformer(BlockMiddleware):
+    def __init__(self, *, interactive: bool):
         self._interactive = interactive
         self._allow_inplace_modification = True
 
@@ -158,7 +205,9 @@ def main():
     parser.add_argument("bib_file")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
-    # TODO -r is always on
+    parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
+    parser.add_argument("-u", "--unused", action="store_true", help="remove unused entries")
+    parser.add_argument("-n", "--names", action="store_true", help="format author names")
 
     args = parser.parse_args()
 
@@ -170,12 +219,19 @@ def main():
 
     db = bibtexparser.parse_file(bib_file_name)
 
-    middleware = [
-        FilterUsedTransformer("."),
-        LookupDoiTransformer(interactive=args.interactive),
-        FilterOrderFieldTransformer(FIELD_MAP)
-        
-    ]
+    middleware = []
+    if args.unused:
+        middleware.append(FilterUsedTransformer("."))
+    if args.replace:
+        middleware.append(LookupDoiTransformer(interactive=args.interactive))
+    middleware.append(FilterOrderFieldTransformer(FIELD_MAP, todo=args.todo))
+    if args.names:
+        middleware.append(SeparateCoAuthors())
+        middleware.append(SplitNameParts())
+        middleware.append(FormatNamesTransformer())
+        middleware.append(MergeNameParts())
+        middleware.append(MergeCoAuthors())
+
     bibtexparser.write_file(bib_file_name, library=db, append_middleware=middleware)
 
 if __name__ == "__main__":
