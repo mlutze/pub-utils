@@ -99,7 +99,7 @@ def titlecase_name(name: NameParts) -> NameParts:
 def set_field(entry: Entry, key: str, value: Any) -> Entry:
     new_fields_dict = entry.fields_dict.copy()
     new_fields_dict[key] = Field(key, value)
-    new_fields = list(new_fields_dict.keys())
+    new_fields = list(new_fields_dict.values())
     return Entry(
         entry_type=entry.entry_type,
         key=entry.key,
@@ -249,7 +249,7 @@ class LookupCitationTransformer(BlockMiddleware):
                 for field in crossref_fields:
                     if field not in new_fields:
                         new_fields[field] = crossref_fields[field]
-                return Entry(entry.entry_type, key=entry.key, fields = list(new_fields.keys()))
+                return Entry(entry.entry_type, key=entry.key, fields = list(new_fields.values()))
 
 def main():
     parser = argparse.ArgumentParser(

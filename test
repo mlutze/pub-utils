@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+tmpfile=$(mktemp)
+
+./fix-bib -o $tmpfile ./test-resources/test-idempotent.bib
+diff $tmpfile test-resources/expected.bib
+
+./fix-bib -n -o $tmpfile ./test-resources/test-names-1.bib
+diff $tmpfile test-resources/expected.bib
+
