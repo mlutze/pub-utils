@@ -234,7 +234,8 @@ class TodoFieldTransformer(BlockMiddleware):
             )
 
 class LookupDoiTransformer(BlockMiddleware):
-    def __init__(self):
+    def __init__(self, *, browserless: bool):
+        self._browserless = browserless
         self._allow_inplace_modification = True
     
     @staticmethod
@@ -252,8 +253,9 @@ class LookupDoiTransformer(BlockMiddleware):
                 print("Cannot look up DOI for titleless entry: " + entry.key)
                 return entry
             else:
-                print("Let me Google that for you...")
-                webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
+                if not self._browserless:
+                    print("Let me Google that for you...")
+                    webbrowser.open("https://scholar.google.com/scholar?q=" + title.value)
                 raw_doi = input("Enter the DOI or leave blank to skip: ")
                 if raw_doi.strip() == "":
                     print("Skipping DOI")
@@ -317,6 +319,8 @@ def main():
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
     parser.add_argument("-u", "--unused", action="store_true", help="remove unused entries")
 
+    parser.add_argument("-X", "--browserless", action="store_true", help=argparse.SUPPRESS)
+
     args = parser.parse_args()
 
     bib_file_name = args.bib_file
@@ -335,7 +339,7 @@ def main():
     if args.unused:
         middleware.append(FilterUsedTransformer("."))
     if args.interactive:
-        middleware.append(LookupDoiTransformer())
+        middleware.append(LookupDoiTransformer(browserless=args.browserless))
     if args.lookup:
         middleware.append(LookupCitationTransformer(clobber=args.replace))
     if args.filter:
