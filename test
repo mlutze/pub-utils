@@ -43,3 +43,8 @@ name="test-replace-2"
 echo "Testing $name"
 ./fix-bib -lr -o $tmpfile "./test-resources/$name.bib"
 diff $tmpfile "test-resources/expected/$name.bib"
+
+name="test-filter-1"
+echo "Testing $name"
+./fix-bib -f -o $tmpfile "./test-resources/$name.bib"
+diff $tmpfile "test-resources/expected/$name.bib"
