@@ -19,13 +19,27 @@ def log(string):
     """Logs the string to the appropriate stream."""
     print(string)
 
+FIELD_ORDER = [
+    "title",
+    "author",
+    "journal",
+    "booktitle",
+    "institution",
+    "volume",
+    "number",
+    "year",
+    "school",
+    "publisher",
+    "doi"
+]
+
 FIELD_MAP = {
-    "article": ["title", "author", "journal", "volume", "number", "year", "doi"],
-    "phdthesis": ["title", "author", "year", "school", "doi"],
-    "inproceedings": ["title", "author", "booktitle", "year", "doi"],
-    "techreport": ["title", "author", "institution", "year", "doi"],
-    "book": ["title", "author", "volume", "year", "publisher", "doi"],
-    "incollection": ["title", "author", "booktitle", "year", "doi"]
+    "article": set(["title", "author", "journal", "volume", "number", "year", "doi"]),
+    "phdthesis": set(["title", "author", "year", "school", "doi"]),
+    "inproceedings": set(["title", "author", "booktitle", "year", "doi"]),
+    "techreport": set(["title", "author", "institution", "year", "doi"]),
+    "book": set(["title", "author", "volume", "year", "publisher", "doi"]),
+    "incollection": set(["title", "author", "booktitle", "year", "doi"])
 }
 
 def get_tex_files(root: str) -> list[str]:
@@ -140,11 +154,30 @@ class FilterUsedTransformer(BlockMiddleware):
         else:
             log("Removing unused entry: " + entry.key)
             return None
+        
+class OrderFieldTransformer(BlockMiddleware):
+    def __init__(self, order):
+        self._indices = {}
+        for i in range(len(order)):
+            self._indices[order[i]] = i
+        self._allow_inplace_modification = False
 
-class FilterOrderFieldTransformer(BlockMiddleware):
-    def __init__(self, map, *, todo):
+    @staticmethod
+    def metadata_key():
+        return OrderFieldTransformer(BlockMiddleware)
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Library:
+        fields = entry.fields
+        new_fields = sorted(fields, key=lambda f: self._indices.get(f.key, float("inf")))
+        return Entry(
+            entry_type=entry.entry_type,
+            key=entry.key,
+            fields=new_fields
+        )
+
+class FilterFieldTransformer(BlockMiddleware):
+    def __init__(self, map):
         self._map = map
-        self._todo = todo
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -168,18 +201,37 @@ class FilterOrderFieldTransformer(BlockMiddleware):
             log("Not modifying unknown entry type: " + entry.entry_type)
             return entry
         else:
-            def get_field(key):
-                if key in entry.fields_dict:
-                    return Field(key, entry.fields_dict[key].value)
-                else:
-                    log("Missing key '" + key + "' for entry: " + entry.key)
-                    if self._todo:
-                        return Field(key, "TODO")
-                    else:
-                        return None
-            fields = [get_field(key) for key in keys]
-            fields = [f for f in fields if f is not None]
-            return Entry(entry.entry_type, entry.key, fields)
+            new_fields = [field for field in entry.fields if field.key in keys]
+            return Entry(
+                entry_type=entry.entry_type,
+                key=entry.key,
+                fields=new_fields
+            )
+
+class TodoFieldTransformer(BlockMiddleware):
+    def __init__(self, map):
+        self._map = map
+        self._allow_inplace_modification = True
+    
+    @staticmethod
+    def metadata_key():
+        return "TodoFieldTransformer"
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
+        keys = self._map.get(entry.entry_type, None)
+        if keys is None:
+            log("Not modifying unknown entry type: " + entry.entry_type)
+            return entry
+        else:
+            present_keys = set(entry.fields_dict.keys())
+            missing_keys = [key for key in keys if key not in present_keys]
+            missing_fields = [Field(key, "TODO") for key in missing_keys]
+            new_fields = entry.fields + missing_fields
+            return Entry(
+                entry_type=entry.entry_type,
+                key=entry.key,
+                fields=new_fields
+            )
 
 class LookupDoiTransformer(BlockMiddleware):
     def __init__(self):
@@ -256,10 +308,11 @@ def main():
         description="Clean up a BibTeX file according to Flix contributor conventions."
     )
     parser.add_argument("bib_file")
+    parser.add_argument("-f", "--filter", action="store_true", help="filter down to required fields")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+    parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
-    parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
     parser.add_argument("-u", "--unused", action="store_true", help="remove unused entries")
@@ -285,7 +338,11 @@ def main():
         middleware.append(LookupDoiTransformer())
     if args.lookup:
         middleware.append(LookupCitationTransformer(clobber=args.replace))
-    middleware.append(FilterOrderFieldTransformer(FIELD_MAP, todo=args.todo))
+    if args.filter:
+        middleware.append(FilterFieldTransformer(FIELD_MAP))
+    if args.todo:
+        middleware.append(TodoFieldTransformer(FIELD_MAP))
+    middleware.append(OrderFieldTransformer(FIELD_ORDER))
     if args.names:
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
