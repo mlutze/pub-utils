@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -e
+
+# default format is .tar.gz
+format="tar"
+
+while getopts 'htz' opt; do
+    case "$opt" in
+        t)
+            format="tar"
+            ;;
+        z)
+            format="zip"
+            ;;
+        h)
+            echo "Usage: mk-sub [-t] [-z] [-h] main_file output_title"
+            echo ""
+            echo "Arguments:"
+            echo "  main_file       the base TeX file of the submission"
+            echo "  output_title    the title of the output file"
+            echo ""
+            echo "Options:"
+            echo "    -t     use .tar.gz compression (default)"
+            echo "    -z     use .zip compression"
+            echo "    -h     display this help information"
+            exit
+            ;;
+        ?)
+            >&2 echo "Run 'mk-sub -h' for help information."
+            exit 1
+            ;;
+    esac
+done
+
+main="$1"
+outtitle="$2"
+
+if [ "$main" = "" ]; then
+    >&2 echo "Missing argument: main_file"
+    >&2 echo "Run 'mk-sub -h' for help information."
+    exit 1
+elif [ "$outtitle" = "" ]; then
+    >&2 echo "Missing argument: output_file"
+    >&2 echo "Run 'mk-sub -h' for help information."
+    exit 1
+fi
+
+depfile=$(mktemp)
+workdir=$(mktemp -d)
+basedir=$(pwd)
+
+subdir="$workdir/$outtitle"
+
+mkdir "$subdir"
+
+# build the paper
+latexmk -deps -deps-out="$depfile" paper.tex 2> /dev/null
+
+# parse dependents file
+deps=$(cat "$depfile" | tail -n +3 | tr '\\' ' ' | awk '{print $1}' | grep -v '^/' | head -n -1)
+
+# add every file in the dependencies
+for file in $deps; do
+    cp --parents -v "$file" "$subdir"
+done
+
+# add the bbl file (some submission sites want this)
+cp --parents -v "paper.bbl" "$subdir"
+
+# navigate to the working directory
+cd "$workdir"
+
+# compress according to the requested format
+if [ "$format" = "tar" ]; then
+    tar -cfz "$outtitle.tar.gz" "$outtitle"
+    mv "$outtitle.tar.gz" "$basedir"
+elif [ "$format" = "zip" ]; then
+    zip -r "$outtitle.zip" "$outtitle"
+    mv "$outtitle.tar.gz" "$basedir"
+else
+    echo "Unexpected format: $format"
+    exit 1
+fi
+
+# go back to the base directory
+cd "$basedir"
