@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e
+
+for dir in *; do
+    if [ -d $dir ]; then
+        cd $dir
+        ./test
+        cd ..
+    fi
+done
