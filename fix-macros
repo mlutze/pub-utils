@@ -39,10 +39,12 @@ class MacroCollector(LatexNodesVisitor):
                     self._declared_macros.add(name)
         self._used_macros[node.macroname] += 1
     
+    def get_unused_macros(self):
+        # <= 1 because the declaration counts as a use
+        return set(macro for macro in self._declared_macros if self._used_macros[macro] <= 1)
 
 source = r"\newcommand\hello{\goodbye}"
 content, _ = LatexWalker(source).parse_content(LatexGeneralNodesParser())
 collector = MacroCollector()
 collector.start(content)
-print(collector._declared_macros)
-print(collector._used_macros)
+print(collector.get_unused_macros())
