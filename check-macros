@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import os
+
 from collections import Counter
 
 from pylatexenc.latexnodes.parsers import LatexGeneralNodesParser
@@ -43,8 +45,26 @@ class MacroCollector(LatexNodesVisitor):
         # <= 1 because the declaration counts as a use
         return set(macro for macro in self._declared_macros if self._used_macros[macro] <= 1)
 
-source = r"\newcommand\hello{\goodbye}"
-content, _ = LatexWalker(source).parse_content(LatexGeneralNodesParser())
-collector = MacroCollector()
-collector.start(content)
-print(collector.get_unused_macros())
+def get_tex_files(root: str) -> list[str]:
+    """Returns the list of TeX files under the given root directory."""
+    files: list[str] = []
+    for (dir_name, _, file_names) in os.walk(root):
+        for file_name in file_names:
+            if file_name.endswith(".tex"):
+                files.append(os.path.join(dir_name, file_name))
+            else:
+                pass
+    return files
+
+def main():
+    collector = MacroCollector()
+    tex_files = get_tex_files(".")
+    for tex_file in tex_files:
+        with open(tex_file) as file:
+            source = file.read()
+            content, _ = LatexWalker(source).parse_content(LatexGeneralNodesParser())
+            collector.start(content)
+    print(collector.get_unused_macros())
+
+if __name__ == "__main__":
+    main()
