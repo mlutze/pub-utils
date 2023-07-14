@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+
+from collections import Counter
+
+from pylatexenc.latexnodes.parsers import LatexGeneralNodesParser
+from pylatexenc.latexnodes.nodes import LatexMacroNode, LatexGroupNode, LatexNodeList
+from pylatexenc.latexnodes import ParsedArguments
+from pylatexenc.latexwalker import LatexNodesVisitor
+from pylatexenc.latexwalker import LatexWalker
+
+class MacroCollector(LatexNodesVisitor):
+    def __init__(self) -> None:
+        self._declared_macros = set()
+        self._used_macros = Counter()
+        self._declared_environments = set()
+        self._used_environments = Counter()
+        super().__init__()
+
+    def visit_macro_node(self, node: LatexMacroNode):
+        if node.macroname == "newcommand":
+            node.nodeargd: ParsedArguments
+            new_macro = node.nodeargd.argnlist[1]
+            match new_macro:
+                case LatexGroupNode():
+                    nodes: LatexNodeList = new_macro.nodelist
+                    nodelist = nodes.nodelist
+                    match nodelist:
+                        case [macro]:
+                            match macro:
+                                case LatexMacroNode():
+                                    name = macro.macroname
+                                    self._declared_macros.add(name)
+                                case _:
+                                    raise Exception("bad macro declaration")
+                        case _:
+                            raise Exception("bad macro declaration")
+                case LatexMacroNode():
+                    name = new_macro.macroname
+                    self._declared_macros.add(name)
+        self._used_macros[node.macroname] += 1
+    
+
+source = r"\newcommand\hello{\goodbye}"
+content, _ = LatexWalker(source).parse_content(LatexGeneralNodesParser())
+collector = MacroCollector()
+collector.start(content)
+print(collector._declared_macros)
+print(collector._used_macros)
