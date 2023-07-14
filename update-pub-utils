@@ -5,7 +5,7 @@ set -e
 bin="$1"
 
 if [ "$bin" = "" ]; then
-    bin="~/bin"
+    bin="$HOME/bin"
 fi
 
 basepath="https://raw.githubusercontent.com/mlutze/pub-utils/master"
