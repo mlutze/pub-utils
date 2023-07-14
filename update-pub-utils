@@ -2,6 +2,12 @@
 
 set -e
 
+bin="$1"
+
+if [ "$bin" = "" ]; then
+    bin="~/bin"
+fi
+
 basepath="https://raw.githubusercontent.com/mlutze/pub-utils/master"
 
 manifest=$(mktemp)
@@ -10,5 +16,5 @@ manifest=$(mktemp)
 curl --fail-with-body "$basepath/manifest" > "$manifest"
 
 for file in $(cat "$manifest"); do
-    curl "$basepath/$file" > "$file"
+    curl "$basepath/$file" > "$bin/$file"
 done
