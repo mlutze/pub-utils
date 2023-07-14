@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 
 from collections import Counter
 
@@ -57,14 +58,26 @@ def get_tex_files(root: str) -> list[str]:
     return files
 
 def main():
+    if len(sys.argv) > 1:
+        tex_files = sys.argv[1:]
+    else:
+        tex_files = get_tex_files(".")
+
     collector = MacroCollector()
-    tex_files = get_tex_files(".")
     for tex_file in tex_files:
         with open(tex_file) as file:
             source = file.read()
             content, _ = LatexWalker(source).parse_content(LatexGeneralNodesParser())
             collector.start(content)
-    print(collector.get_unused_macros())
+
+    unused = sorted(collector.get_unused_macros())
+    for macro in unused:
+        print(macro)
+    if len(unused) > 0:
+        exit(1)
+    else:
+        exit(0)
+    
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e
+
+tmpfile=$(mktemp)
+root="../.."
+
+name="test-macro-1"
+echo "Testing $name"
+$root/check-macros "input/$name.tex" > "$tmpfile" || true
+diff "$tmpfile" "expected/$name.out"
