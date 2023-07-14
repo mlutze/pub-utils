@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -e
+
+basepath="https://raw.githubusercontent.com/mlutze/pub-utils/master"
+
+manifest=$(mktemp)
+
+# get the manifest
+curl --fail-with-body "$basepath/manifest" > "$manifest"
+
+for file in $(cat "$manifest"); do
+    curl "$basepath/$file" > "$file"
+done
