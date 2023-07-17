@@ -14,5 +14,9 @@ jobs:
     steps:
       - name: Check out the master branch
         uses: actions/checkout@v2
+      - name: Install Bibtex Parser
+        run: pip install --no-cache-dir --force-reinstall git+https://github.com/sciunto-org/python-bibtexparser@main
+      - name: Install Habanero
+        run: pip install habanero
       - name: Run tests
         run: cd test; ./test
