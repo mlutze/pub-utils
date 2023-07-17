@@ -18,5 +18,7 @@ jobs:
         run: pip install --no-cache-dir --force-reinstall git+https://github.com/sciunto-org/python-bibtexparser@main
       - name: Install Habanero
         run: pip install habanero
+      - name: Install Latex Parser
+        run: pip install pylatexenc==3.0a17
       - name: Run tests
         run: cd test; ./test
