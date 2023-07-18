@@ -12,3 +12,5 @@ A collection of utilities for managing LaTeX publications
 - [`bibtex-parser`](https://github.com/sciunto-org/python-bibtexparser)
 - [`habanero`](https://github.com/sckott/habanero)
 - [`pylatexec`](https://github.com/phfaist/pylatexenc)
+
+_see [`requirements.txt`](./requirements.txt) for version details_
