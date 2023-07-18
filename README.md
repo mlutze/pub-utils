@@ -8,4 +8,4 @@ A collection of utilities for managing LaTeX publications
 
 ### Dependencies
 - [`bibtex-parser`](https://github.com/sciunto-org/python-bibtexparser)
-- [`havanero`](https://github.com/sckott/habanero)
+- [`habanero`](https://github.com/sckott/habanero)
