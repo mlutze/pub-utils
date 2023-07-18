@@ -149,7 +149,7 @@ class FilterUsedTransformer(BlockMiddleware):
         return "FilterUsedTransformer"
     
     def transform(self, library: Library) -> Library:
-        block_or_nones = [self.transform_block(b) for b in library.blocks]
+        block_or_nones = [self.transform_block(b, library) for b in library.blocks]
         blocks = [b for b in block_or_nones if b is not None]
         return Library(blocks)
     
