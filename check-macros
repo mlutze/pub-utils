@@ -6,7 +6,7 @@ import sys
 from collections import Counter
 
 from pylatexenc.latexnodes.parsers import LatexGeneralNodesParser
-from pylatexenc.latexnodes.nodes import LatexMacroNode, LatexGroupNode, LatexNodeList
+from pylatexenc.latexnodes.nodes import LatexMacroNode, LatexGroupNode, LatexNodeList, LatexCharsNode, LatexEnvironmentNode
 from pylatexenc.latexnodes import ParsedArguments
 from pylatexenc.latexwalker import LatexNodesVisitor
 from pylatexenc.latexwalker import LatexWalker
@@ -40,11 +40,28 @@ class MacroCollector(LatexNodesVisitor):
                 case LatexMacroNode():
                     name = new_macro.macroname
                     self._declared_macros.add(name)
+        elif node.macroname == "newenvironment":
+            node.nodeargd: ParsedArguments
+            new_environment = node.nodeargd.argnlist[1]
+            match new_environment:
+                case LatexGroupNode():
+                    nodelist: LatexNodeList = new_environment.nodelist
+                    name = nodelist.nodelist[0].chars
+                    self._declared_environments.add(name)
+                case _:
+                    raise Exception("bad environment declaration")
+
         self._used_macros[node.macroname] += 1
+    
+    def visit_environment_node(self, node: LatexEnvironmentNode):
+        self._used_environments[node.environmentname] += 1
     
     def get_unused_macros(self):
         # <= 1 because the declaration counts as a use
         return set(macro for macro in self._declared_macros if self._used_macros[macro] <= 1)
+    
+    def get_unused_envs(self):
+        return set(env for env in self._declared_environments if self._used_environments[env] <= 0)
 
 def get_tex_files(root: str) -> list[str]:
     """Returns the list of TeX files under the given root directory."""
@@ -70,7 +87,7 @@ def main():
             content, _ = LatexWalker(source).parse_content(LatexGeneralNodesParser())
             collector.start(content)
 
-    unused = sorted(collector.get_unused_macros())
+    unused = sorted(collector.get_unused_macros().union(collector.get_unused_envs()))
     for macro in unused:
         print(macro)
     if len(unused) > 0:
