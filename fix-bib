@@ -12,6 +12,7 @@ from bibtexparser.middlewares.middleware import BlockMiddleware
 from bibtexparser.model import Block, Entry, Field
 from bibtexparser.middlewares.names import NameParts
 from bibtexparser.middlewares.names import SeparateCoAuthors, SplitNameParts, MergeCoAuthors, MergeNameParts
+from bibtexparser.writer import BibtexFormat
 
 from habanero import cn
 
@@ -359,7 +360,11 @@ def main():
         middleware.append(MergeNameParts())
         middleware.append(MergeCoAuthors())
 
-    bibtexparser.write_file(out_file, library=db, append_middleware=middleware)
+    bib_format = BibtexFormat()
+    bib_format.indent = "  "
+    bib_format.value_column = "auto"
+
+    bibtexparser.write_file(out_file, library=db, append_middleware=middleware, bibtex_format=bib_format)
 
 if __name__ == "__main__":
     main()
