@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Collection, Mapping, Optional, Union
+from typing import Any, Mapping, Optional
 import argparse
 import os
 import shutil
@@ -19,6 +19,8 @@ from bibtexparser.middlewares.sorting_blocks import SortBlocksByTypeAndKeyMiddle
 from bibtexparser.writer import BibtexFormat
 
 from habanero import cn
+
+from unidecode import unidecode
 
 def log(string):
     """Logs the string to the appropriate stream."""
@@ -365,7 +367,8 @@ class FormatKeysMiddleware(BlockMiddleware):
             return entry
         first_author: NameParts = author_list[0]
         year = year_field.value
-        key = "".join(first_author.von + first_author.last).lower() + year
+        raw_key = "".join(first_author.von + first_author.last).lower() + year
+        key = unidecode(raw_key)
         if entry.key in self._replacements:
             log("Not replacing duplicate key: ")
             return entry
