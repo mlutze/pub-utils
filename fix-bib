@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-from typing import Any, Optional
+from typing import Any, Collection, Mapping, Optional, Union
 import argparse
 import os
 import shutil
 import webbrowser
+from collections import Counter
+from tempfile import TemporaryDirectory
+import re
 
 
 import bibtexparser
@@ -63,6 +66,23 @@ def file_contains(file_name: str, string: str) -> bool:
                 return True
         else:
             return False
+
+def multiple_replace(text: str, mapping: Mapping[str, str]) -> str:
+  """Replace strings in the text according to the dictionary."""
+  # https://code.activestate.com/recipes/81330-single-pass-multiple-replace/
+  regex = re.compile("(%s)" % "|".join(map(re.escape, mapping.keys())))
+  return regex.sub(lambda mo: mapping[mo.string[mo.start():mo.end()]], text) 
+        
+def replace_in_file(file_name: str, mapping: Mapping[str, str]) -> None:
+    """Replaces text according to the mapping in the given file."""
+    with open(file_name) as file:
+        with TemporaryDirectory() as tmp_dir_name:
+            tmp_file_name = tmp_dir_name + "/" + "tmp.tex"
+            with open(tmp_file_name, "+w") as tmp_file:
+                for line in file:
+                    tmp_file.write(multiple_replace(line, mapping))
+            shutil.copyfile(tmp_file_name, file_name)
+            
 
 def clean_doi(string: str) -> Optional[str]:
     """Removes any link information from the DOI string. Returns None if the string does not appear to represent a DOI.
@@ -312,13 +332,62 @@ class LookupCitationTransformer(BlockMiddleware):
                         new_fields[field] = crossref_fields[field]
                 return Entry(entry.entry_type, key=entry.key, fields = list(new_fields.values()))
 
+class FormatKeysMiddleware(BlockMiddleware):
+    def __init__(self, root: str):
+        self._root = root
+        self._allow_inplace_modification = True
+        self._replacements = {}
+        self._new_keys = Counter()
+
+    @staticmethod
+    def metadata_key():
+        return "FormatKeysMiddleware"
+
+    def transform(self, library: Library) -> Library:
+        result = super().transform(library)
+        files = get_tex_files(self._root)
+        for file in files:
+            replace_in_file(file, self._replacements)
+        return result
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
+        author_field = entry.fields_dict.get("author", None)
+        year_field = entry.fields_dict.get("year", None)
+        if author_field is None:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        if year_field is None:
+            log("Cannot format key for yearless entry: " + entry.key)
+            return entry
+        author_list = author_field.value
+        if author_list == []:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        first_author: NameParts = author_list[0]
+        year = year_field.value
+        key = "".join(first_author.von + first_author.last).lower() + year
+        if entry.key in self._replacements:
+            log("Not replacing duplicate key: ")
+            return entry
+        # append suffix to key if needed
+        if key in self._new_keys:
+            new_key = key + chr(self._new_keys[key] + ord('a'))
+        else:
+            new_key = key
+        # add the short key to the counter
+        self._new_keys[key] += 1
+        self._replacements[entry.key] = new_key
+        return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Clean up a BibTeX file according to Flix contributor conventions."
     )
     parser.add_argument("bib_file")
+    parser.add_argument("-d", "--dir", action="store", help="specify a directory for .tex files (default current directory)")
     parser.add_argument("-f", "--filter", action="store_true", help="filter down to required fields")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+    parser.add_argument("-k", "--keys", action="store_true", help="modify entry keys")
     parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
@@ -338,13 +407,18 @@ def main():
         out_file = bib_file_name
     else:
         out_file = args.output
+    
+    if args.dir is None:
+        root = "."
+    else:
+        root = args.dir
 
 
     db = bibtexparser.parse_file(bib_file_name)
 
     middleware = []
     if args.unused:
-        middleware.append(FilterUsedTransformer("."))
+        middleware.append(FilterUsedTransformer(root))
     if args.interactive:
         middleware.append(LookupDoiTransformer(browserless=args.browserless))
     if args.lookup:
@@ -353,13 +427,19 @@ def main():
         middleware.append(FilterFieldTransformer(FIELD_MAP))
     if args.todo:
         middleware.append(TodoFieldTransformer(FIELD_MAP))
-    middleware.append(OrderFieldTransformer(FIELD_ORDER))
     if args.names:
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
         middleware.append(FormatNamesTransformer())
         middleware.append(MergeNameParts())
         middleware.append(MergeCoAuthors())
+    if args.keys:
+        middleware.append(SeparateCoAuthors())
+        middleware.append(SplitNameParts())
+        middleware.append(FormatKeysMiddleware(root))
+        middleware.append(MergeNameParts())
+        middleware.append(MergeCoAuthors())
+    middleware.append(OrderFieldTransformer(FIELD_ORDER))
     middleware.append(SortBlocksByTypeAndKeyMiddleware())
 
     bib_format = BibtexFormat()
