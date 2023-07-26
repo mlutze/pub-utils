@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Optional
+from typing import Any, Collection, Optional, Union
 import argparse
 import os
 import shutil
@@ -312,6 +312,29 @@ class LookupCitationTransformer(BlockMiddleware):
                         new_fields[field] = crossref_fields[field]
                 return Entry(entry.entry_type, key=entry.key, fields = list(new_fields.values()))
 
+class FormatKeysMiddleware(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
+        author_field = entry.fields_dict.get("author", None)
+        year_field = entry.fields_dict.get("year", None)
+        if author_field is None:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        if year_field is None:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        author_list = author_field.value
+        if author_list == []:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        first_author: NameParts = author_list[0]
+        first_author.von
+        if author_list != new_author_list:
+            log("Modified author formatting for entry: " + entry.key)
+        return set_field(entry, "author", new_author_list)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Clean up a BibTeX file according to Flix contributor conventions."
@@ -319,6 +342,7 @@ def main():
     parser.add_argument("bib_file")
     parser.add_argument("-f", "--filter", action="store_true", help="filter down to required fields")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
+    parser.add_argument("-k", "--keys", action="store_true", help="modify entry keys")
     parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
