@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Collection, Mapping, Optional, Union
+from typing import Any, Mapping, Optional
 import argparse
 import os
 import shutil
@@ -16,7 +16,6 @@ from bibtexparser.model import Block, Entry, Field
 from bibtexparser.middlewares.names import NameParts
 from bibtexparser.middlewares.names import SeparateCoAuthors, SplitNameParts, MergeCoAuthors, MergeNameParts
 from bibtexparser.middlewares.sorting_blocks import SortBlocksByTypeAndKeyMiddleware
-from bibtexparser.middlewares import LatexDecodingMiddleware, LatexEncodingMiddleware, AddEnclosingMiddleware
 from bibtexparser.writer import BibtexFormat
 
 from habanero import cn
@@ -324,7 +323,7 @@ class LookupCitationTransformer(BlockMiddleware):
             if crossref_bibtex is None:
                 log("Not modifying entry with invalid doi:" + entry.key)
                 return entry
-            crossref_entry = bibtexparser.parse_string(crossref_bibtex, append_middleware=[LatexDecodingMiddleware()]).entries[0]
+            crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
             if self._clobber:
                 return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
             else:
