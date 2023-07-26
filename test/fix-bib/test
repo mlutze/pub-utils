@@ -67,18 +67,18 @@ root="../.."
 
 
 name="test-keys-1"
+echo "Testing $name"
 tmproot=$(mktemp -d)
 cp "input/$name.tex" "$tmproot"
-echo "Testing $name"
 $root/fix-bib -k -d "$tmproot" -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
 diff "$tmproot/$name.tex" "expected/$name.tex"
 
 
 name="test-keys-2"
+echo "Testing $name"
 tmproot=$(mktemp -d)
 cp "input/$name.tex" "$tmproot"
-echo "Testing $name"
-$root/fix-bib -k -d "resources-keys" -o "$tmpfile" "input/$name.bib"
+$root/fix-bib -k -d "$tmproot" -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
 diff "$tmproot/$name.tex" "expected/$name.tex"

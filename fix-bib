@@ -70,15 +70,15 @@ def file_contains(file_name: str, string: str) -> bool:
 def multiple_replace(text: str, mapping: Mapping[str, str]) -> str:
   """Replace strings in the text according to the dictionary."""
   # https://code.activestate.com/recipes/81330-single-pass-multiple-replace/
-  regex = re.compile("(%s)" % "|".join(map(re.escape, dict.keys())))
+  regex = re.compile("(%s)" % "|".join(map(re.escape, mapping.keys())))
   return regex.sub(lambda mo: mapping[mo.string[mo.start():mo.end()]], text) 
         
 def replace_in_file(file_name: str, mapping: Mapping[str, str]) -> None:
     """Replaces text according to the mapping in the given file."""
     with open(file_name) as file:
         with TemporaryDirectory() as tmp_dir_name:
-            tmp_file_name = tmp_dir_name + "/" + file_name
-            with open(tmp_file_name) as tmp_file:
+            tmp_file_name = tmp_dir_name + "/" + "tmp.tex"
+            with open(tmp_file_name, "+w") as tmp_file:
                 for line in file:
                     tmp_file.write(multiple_replace(line, mapping))
             shutil.copyfile(tmp_file_name, file_name)
