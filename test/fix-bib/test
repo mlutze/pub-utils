@@ -74,8 +74,15 @@ $root/fix-bib -k -d "$tmproot" -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
 diff "$tmproot/$name.tex" "expected/$name.tex"
 
-
 name="test-keys-2"
+echo "Testing $name"
+tmproot=$(mktemp -d)
+cp "input/$name.tex" "$tmproot"
+$root/fix-bib -k -d "$tmproot" -o "$tmpfile" "input/$name.bib"
+diff "$tmpfile" "expected/$name.bib"
+diff "$tmproot/$name.tex" "expected/$name.tex"
+
+name="test-keys-3"
 echo "Testing $name"
 tmproot=$(mktemp -d)
 cp "input/$name.tex" "$tmproot"
