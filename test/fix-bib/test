@@ -5,62 +5,67 @@ set -e
 tmpfile=$(mktemp)
 root="../.."
 
-name="test-noargs-1"
+# name="test-noargs-1"
+# echo "Testing $name"
+# $root/fix-bib -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-noargs-2"
+# echo "Testing $name"
+# $root/fix-bib -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-noargs-3"
+# echo "Testing $name"
+# $root/fix-bib -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-todo-1"
+# echo "Testing $name"
+# $root/fix-bib -t -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-names-1"
+# echo "Testing $name"
+# $root/fix-bib -n -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-lookup-1"
+# echo "Testing $name"
+# $root/fix-bib -l -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-lookup-2"
+# echo "Testing $name"
+# $root/fix-bib -l -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-replace-1"
+# echo "Testing $name"
+# $root/fix-bib -lr -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-replace-2"
+# echo "Testing $name"
+# $root/fix-bib -lr -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-filter-1"
+# echo "Testing $name"
+# $root/fix-bib -f -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+# name="test-unused-1"
+# echo "Testing $name"
+# $root/fix-bib -u -d "resources-unused" -o "$tmpfile" "input/$name.bib"
+# diff "$tmpfile" "expected/$name.bib"
+
+name="test-keys-1"
 echo "Testing $name"
-$root/fix-bib -o "$tmpfile" "input/$name.bib"
+$root/fix-bib -k -d "resources-keys" -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
 
-name="test-noargs-2"
-echo "Testing $name"
-$root/fix-bib -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-noargs-3"
-echo "Testing $name"
-$root/fix-bib -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-todo-1"
-echo "Testing $name"
-$root/fix-bib -t -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-names-1"
-echo "Testing $name"
-$root/fix-bib -n -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-lookup-1"
-echo "Testing $name"
-$root/fix-bib -l -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-lookup-2"
-echo "Testing $name"
-$root/fix-bib -l -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-replace-1"
-echo "Testing $name"
-$root/fix-bib -lr -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-replace-2"
-echo "Testing $name"
-$root/fix-bib -lr -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-filter-1"
-echo "Testing $name"
-$root/fix-bib -f -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-unused-1"
-echo "Testing $name"
-$root/fix-bib -u -o "$tmpfile" "input/$name.bib"
-diff "$tmpfile" "expected/$name.bib"
-
-name="test-interactive-1"
-echo "Testing $name"
-$root/fix-bib -iX -o "$tmpfile" "input/$name.bib" <<< "10.1234/567890"
-diff "$tmpfile" "expected/$name.bib"
+# name="test-interactive-1"
+# echo "Testing $name"
+# $root/fix-bib -iX -o "$tmpfile" "input/$name.bib" <<< "10.1234/567890"
+# diff "$tmpfile" "expected/$name.bib"

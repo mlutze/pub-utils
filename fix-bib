@@ -339,6 +339,10 @@ class FormatKeysMiddleware(BlockMiddleware):
         self._replacements = {}
         self._new_keys = Counter()
 
+    @staticmethod
+    def metadata_key():
+        return "FormatKeysMiddleware"
+
     def transform(self, library: Library) -> Library:
         result = super().transform(library)
         files = get_tex_files(self._root)
@@ -353,7 +357,7 @@ class FormatKeysMiddleware(BlockMiddleware):
             log("Cannot format key for authorless entry: " + entry.key)
             return entry
         if year_field is None:
-            log("Cannot format key for authorless entry: " + entry.key)
+            log("Cannot format key for yearless entry: " + entry.key)
             return entry
         author_list = author_field.value
         if author_list == []:
@@ -365,18 +369,22 @@ class FormatKeysMiddleware(BlockMiddleware):
         if entry.key in self._replacements:
             log("Not replacing duplicate key: ")
             return entry
-        self._new_keys[key] += 1
         # append suffix to key if needed
         if key in self._new_keys:
-            key = key + chr(self._new_keys[key] + ord('a'))
-        self._replacements[entry.key] = key
-        return Entry(entry_type=entry.entry_type, key=key, fields=entry.fields)
+            new_key = key + chr(self._new_keys[key] + ord('a'))
+        else:
+            new_key = key
+        # add the short key to the counter
+        self._new_keys[key] += 1
+        self._replacements[entry.key] = new_key
+        return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
 
 def main():
     parser = argparse.ArgumentParser(
         description="Clean up a BibTeX file according to Flix contributor conventions."
     )
     parser.add_argument("bib_file")
+    parser.add_argument("-d", "--dir", action="store", help="specify a directory for .tex files (default current directory)")
     parser.add_argument("-f", "--filter", action="store_true", help="filter down to required fields")
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
     parser.add_argument("-k", "--keys", action="store_true", help="modify entry keys")
@@ -399,13 +407,18 @@ def main():
         out_file = bib_file_name
     else:
         out_file = args.output
+    
+    if args.dir is None:
+        root = "."
+    else:
+        root = args.dir
 
 
     db = bibtexparser.parse_file(bib_file_name)
 
     middleware = []
     if args.unused:
-        middleware.append(FilterUsedTransformer("."))
+        middleware.append(FilterUsedTransformer(root))
     if args.interactive:
         middleware.append(LookupDoiTransformer(browserless=args.browserless))
     if args.lookup:
@@ -423,7 +436,7 @@ def main():
     if args.keys:
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
-        middleware.append(FormatKeysMiddleware("."))
+        middleware.append(FormatKeysMiddleware(root))
         middleware.append(MergeNameParts())
         middleware.append(MergeCoAuthors())
     middleware.append(OrderFieldTransformer(FIELD_ORDER))
