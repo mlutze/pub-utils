@@ -62,7 +62,7 @@ diff "$tmpfile" "expected/$name.bib"
 
 name="test-interactive-1"
 echo "Testing $name"
-$root/fix-bib -iX -o "$tmpfile" "input/$name.bib" <<< "10.1234/567890"
+$root/fix-bib -iX -o "$tmpfile" "input/$name.bib" <<< "10.1234/567890" > /dev/null
 diff "$tmpfile" "expected/$name.bib"
 
 
@@ -83,6 +83,14 @@ diff "$tmpfile" "expected/$name.bib"
 diff "$tmproot/$name.tex" "expected/$name.tex"
 
 name="test-keys-3"
+echo "Testing $name"
+tmproot=$(mktemp -d)
+cp "input/$name.tex" "$tmproot"
+$root/fix-bib -k -d "$tmproot" -o "$tmpfile" "input/$name.bib"
+diff "$tmpfile" "expected/$name.bib"
+diff "$tmproot/$name.tex" "expected/$name.tex"
+
+name="test-keys-4"
 echo "Testing $name"
 tmproot=$(mktemp -d)
 cp "input/$name.tex" "$tmproot"
