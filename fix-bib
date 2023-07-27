@@ -20,6 +20,8 @@ from bibtexparser.writer import BibtexFormat
 
 from habanero import cn
 
+from pylatexenc.latex2text import LatexNodes2Text
+
 from unidecode import unidecode
 
 def log(string):
@@ -48,6 +50,11 @@ FIELD_MAP = {
     "book": set(["title", "author", "volume", "year", "publisher", "doi"]),
     "incollection": set(["title", "author", "booktitle", "year", "doi"])
 }
+
+def latexdecode(string: str) -> str:
+    """Decodes the LaTeX in the given string."""
+    decoder = LatexNodes2Text()
+    return decoder.latex_to_text(string)
 
 def get_tex_files(root: str) -> list[str]:
     """Returns the list of TeX files under the given root directory."""
@@ -368,7 +375,8 @@ class FormatKeysMiddleware(BlockMiddleware):
         first_author: NameParts = author_list[0]
         year = year_field.value
         raw_key = "".join(first_author.von + first_author.last).lower() + year
-        key = unidecode(raw_key)
+        messy_key = latexdecode(raw_key)
+        key = unidecode(messy_key)
         if entry.key in self._replacements:
             log("Not replacing duplicate key: ")
             return entry
