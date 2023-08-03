@@ -56,7 +56,7 @@ subdir="$workdir/$outtitle"
 mkdir "$subdir"
 
 # build the paper
-latexmk -pdf -deps -deps-out="$depfile" paper.tex 2> /dev/null
+latexmk -pdf -deps -deps-out="$depfile" "$main" 2> /dev/null
 
 # parse dependents file
 deps=$(cat "$depfile" | tail -n +3 | tr '\\' ' ' | awk '{print $1}' | grep -v '^/' | head -n -1)
