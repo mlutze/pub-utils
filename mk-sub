@@ -48,6 +48,7 @@ fi
 depfile=$(mktemp)
 workdir=$(mktemp -d)
 basedir=$(pwd)
+bblfile="$(basename "$main" .tex).bbl"
 
 subdir="$workdir/$outtitle"
 
@@ -65,7 +66,7 @@ for file in $deps; do
 done
 
 # add the bbl file (some submission sites want this)
-cp --parents -v "paper.bbl" "$subdir"
+cp --parents -v "$bblfile" "$subdir"
 
 # navigate to the working directory
 cd "$workdir"
