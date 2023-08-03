@@ -31,6 +31,7 @@ while getopts 'htz' opt; do
             ;;
     esac
 done
+shift $(($OPTIND - 1))
 
 main="$1"
 outtitle="$2"
@@ -48,13 +49,14 @@ fi
 depfile=$(mktemp)
 workdir=$(mktemp -d)
 basedir=$(pwd)
+bblfile="$(basename "$main" ".tex").bbl"
 
 subdir="$workdir/$outtitle"
 
 mkdir "$subdir"
 
 # build the paper
-latexmk -deps -deps-out="$depfile" paper.tex 2> /dev/null
+latexmk -pdf -deps -deps-out="$depfile" "$main" 2> /dev/null
 
 # parse dependents file
 deps=$(cat "$depfile" | tail -n +3 | tr '\\' ' ' | awk '{print $1}' | grep -v '^/' | head -n -1)
@@ -65,18 +67,18 @@ for file in $deps; do
 done
 
 # add the bbl file (some submission sites want this)
-cp --parents -v "paper.bbl" "$subdir"
+cp --parents -v "$bblfile" "$subdir"
 
 # navigate to the working directory
 cd "$workdir"
 
 # compress according to the requested format
 if [ "$format" = "tar" ]; then
-    tar -cfz "$outtitle.tar.gz" "$outtitle"
+    tar -czf "$outtitle.tar.gz" "$outtitle"
     mv "$outtitle.tar.gz" "$basedir"
 elif [ "$format" = "zip" ]; then
     zip -r "$outtitle.zip" "$outtitle"
-    mv "$outtitle.tar.gz" "$basedir"
+    mv "$outtitle.zip" "$basedir"
 else
     echo "Unexpected format: $format"
     exit 1
