@@ -181,11 +181,6 @@ class FilterUsedTransformer(BlockMiddleware):
     def metadata_key():
         return "FilterUsedTransformer"
     
-    def transform(self, library: Library) -> Library:
-        block_or_nones = [self.transform_block(b, library) for b in library.blocks]
-        blocks = [b for b in block_or_nones if b is not None]
-        return Library(blocks)
-    
     def transform_entry(self, entry: Entry, library: Library) -> Block | None:
         if any(file_contains(file_name, entry.key) for file_name in self._tex_files):
             return entry
@@ -221,17 +216,6 @@ class FilterFieldTransformer(BlockMiddleware):
     @staticmethod
     def metadata_key():
         return "FilterOrderFieldTransformer"
-
-    # TODO this is a bug. should report to library authors
-    def transform(self, library: "Library") -> "Library":
-        blocks = []
-        for b in library.blocks:
-            block = self.transform_block(b, library)
-            if block is None:
-                pass
-            else:
-                blocks.append(block)
-        return Library(blocks=blocks)
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         keys = self._map.get(entry.entry_type, None)
