@@ -43,12 +43,12 @@ FIELD_ORDER = [
 ]
 
 FIELD_MAP = {
-    "article": set(["title", "author", "journal", "volume", "number", "year", "doi"]),
-    "phdthesis": set(["title", "author", "year", "school", "doi"]),
-    "inproceedings": set(["title", "author", "booktitle", "year", "doi"]),
-    "techreport": set(["title", "author", "institution", "year", "doi"]),
-    "book": set(["title", "author", "volume", "year", "publisher", "doi"]),
-    "incollection": set(["title", "author", "booktitle", "year", "doi"])
+    "article": sorted(["title", "author", "journal", "volume", "number", "year", "doi"], key=FIELD_ORDER.index),
+    "phdthesis": sorted(["title", "author", "year", "school", "doi"], key=FIELD_ORDER.index),
+    "inproceedings": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index),
+    "techreport": sorted(["title", "author", "institution", "year", "doi"], key=FIELD_ORDER.index),
+    "book": sorted(["title", "author", "volume", "year", "publisher", "doi"], key=FIELD_ORDER.index),
+    "incollection": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index)
 }
 
 def latexdecode(string: str) -> str:
@@ -403,6 +403,7 @@ def main():
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
+    parser.add_argument("-s", "--sort", action="store_true", help="sort entries by key")
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
     parser.add_argument("-u", "--unused", action="store_true", help="remove unused entries")
 
@@ -450,8 +451,9 @@ def main():
         middleware.append(FormatKeysMiddleware(root))
         middleware.append(MergeNameParts())
         middleware.append(MergeCoAuthors())
-    middleware.append(OrderFieldTransformer(FIELD_ORDER))
-    middleware.append(SortBlocksByTypeAndKeyMiddleware())
+    if args.sort:
+        middleware.append(OrderFieldTransformer(FIELD_ORDER))
+        middleware.append(SortBlocksByTypeAndKeyMiddleware())
 
     bib_format = BibtexFormat()
     bib_format.indent = "  "
