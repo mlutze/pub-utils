@@ -25,6 +25,11 @@ echo "Testing $name"
 $root/fix-bib -s -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
 
+name="test-sort-3"
+echo "Testing $name"
+$root/fix-bib -s -o "$tmpfile" "input/$name.bib"
+diff "$tmpfile" "expected/$name.bib"
+
 name="test-todo-1"
 echo "Testing $name"
 $root/fix-bib -t -o "$tmpfile" "input/$name.bib"
