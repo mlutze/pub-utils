@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -e
+
+# make sure we're in the development root
+cwd="$(basename "$(pwd)")"
+
+if [ "$cwd" != "pub-utils" ]; then
+    >&2 echo "This command can only be executed from the pub-utils root."
+    exit 1
+fi
+
+# make a copy of every python script
+for file in *; do
+    # a python script is executable and has "python" in its first line
+    if [ -f "$file" ] && [ -x "$file" ]; then
+        # res=$(head -n 1 "$file" | grep "python" -q || true)
+        if head -n 1 "$file" | grep "python" -q; then
+            cp -v "$file" "$file.py"
+        fi
+    fi
+done
+
+
+# run pigar
+pigar generate
+
+# remove all the python script copies
+rm -v ./*.py
