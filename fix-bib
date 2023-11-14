@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Mapping, Optional
+from typing import Any, Collection, Mapping, Optional, Union
 import argparse
 import os
 import shutil
@@ -12,7 +12,7 @@ import re
 import bibtexparser
 from bibtexparser.library import Library
 from bibtexparser.middlewares.middleware import BlockMiddleware
-from bibtexparser.model import Block, Entry, Field
+from bibtexparser.model import Block, Entry, Field, ImplicitComment, ExplicitComment, Preamble, String
 from bibtexparser.middlewares.names import NameParts
 from bibtexparser.middlewares.names import SeparateCoAuthors, SplitNameParts, MergeCoAuthors, MergeNameParts
 from bibtexparser.middlewares.sorting_blocks import SortBlocksByTypeAndKeyMiddleware
@@ -27,6 +27,8 @@ from unidecode import unidecode
 def log(string):
     """Logs the string to the appropriate stream."""
     print(string)
+
+BLOCK_TYPE_ORDER = (ExplicitComment, String, Preamble, Entry, ImplicitComment)
 
 FIELD_ORDER = [
     "title",
@@ -341,6 +343,17 @@ class LookupCitationTransformer(BlockMiddleware):
                         new_fields[field] = crossref_fields[field]
                 return Entry(entry.entry_type, key=entry.key, fields = list(new_fields.values()))
 
+class RemoveImplicitCommentsTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+    
+    @staticmethod
+    def metadata_key():
+        return "RemoveCommentsMiddleware"
+    
+    def transform_implicit_comment(self, implicit_comment: ImplicitComment, library: Library) -> None:
+        return None
+
 class FormatKeysMiddleware(BlockMiddleware):
     def __init__(self, root: str):
         self._root = root
@@ -453,7 +466,8 @@ def main():
         middleware.append(MergeCoAuthors())
     if args.sort:
         middleware.append(OrderFieldTransformer(FIELD_ORDER))
-        middleware.append(SortBlocksByTypeAndKeyMiddleware())
+        middleware.append(RemoveImplicitCommentsTransformer())
+        middleware.append(SortBlocksByTypeAndKeyMiddleware(BLOCK_TYPE_ORDER))
 
     bib_format = BibtexFormat()
     bib_format.indent = "  "
