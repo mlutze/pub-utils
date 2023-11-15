@@ -337,6 +337,42 @@ class RemoveImplicitCommentsTransformer(BlockMiddleware):
     
     def transform_implicit_comment(self, implicit_comment: ImplicitComment, library: Library) -> None:
         return None
+    
+class GatherKeyRenamesVisitor(BlockMiddleware):
+    def __init__(self, renames: dict[str, str]):
+        self._renames = renames
+        self._duplicate_keys: set(str) = set()
+        self._allow_inplace_modification = True
+    
+    @staticmethod
+    def metadata_key():
+        return "GatherKeyRenamesVisitor"
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+        author_field = entry.fields_dict.get("author", None)
+        year_field = entry.fields_dict.get("year", None)
+        if author_field is None:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        if year_field is None:
+            log("Cannot format key for yearless entry: " + entry.key)
+            return entry
+        author_list = author_field.value
+        if author_list == []:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        first_author: NameParts = author_list[0]
+        year = year_field.value
+        raw_key = "".join(first_author.von + first_author.last).lower() + year
+        messy_key = latexdecode(raw_key)
+        key = unidecode(messy_key)
+        # check whether this key is a duplicate
+        if entry.key in self._renames:
+            self._duplicate_keys = entry.key
+            log("Not renaming duplicate key: ")
+        else:
+            self._renames[entry.key] = key
+        return super().transform_entry(entry, library)
 
 class FormatKeysMiddleware(BlockMiddleware):
     def __init__(self, root: str):
