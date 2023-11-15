@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Collection, Mapping, Optional, Union
+from typing import Any, Collection, Mapping, Optional, TypeVar
 import argparse
 import os
 import shutil
@@ -52,6 +52,18 @@ FIELD_MAP = {
     "book": sorted(["title", "author", "volume", "year", "publisher", "doi"], key=FIELD_ORDER.index),
     "incollection": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index)
 }
+
+K = TypeVar('K')
+V = TypeVar('V')
+
+def invert_dict(d: dict[K, V]) -> dict[V, set[K]]:
+    res = {}
+    for k in d:
+        if k in res:
+            res[k].add(d[k])
+        else:
+            res[k] = set([d[k]])
+    return res
 
 def latexdecode(string: str) -> str:
     """Decodes the LaTeX in the given string."""
@@ -340,15 +352,85 @@ class RemoveImplicitCommentsTransformer(BlockMiddleware):
     
 class GatherKeyRenamesVisitor(BlockMiddleware):
     def __init__(self, renames: dict[str, str]):
+        # old key -> new key
         self._renames = renames
-        self._duplicate_keys: set(str) = set()
+        # old key -> (unindexed new key, title)
+        self._mapping: set[str, (str, str)]
+        self._duplicates: set[str] = set()
         self._allow_inplace_modification = True
     
     @staticmethod
     def metadata_key():
         return "GatherKeyRenamesVisitor"
     
+    def transform(self, library: Library) -> Library:
+        # run the visitor over the entries
+        super().transform(library)
+
+        # then remove duplicates
+        for duplicate in self._duplicates:
+            del self._renames[duplicate]
+
+        # then disambiguate the renames
+        new_to_old = invert_dict(self._mapping)
+        # TODO not right...
+
+        to_keys = Counter(self._renames.values)
+        dup_keys = set(to_key for to_key in to_keys if to_keys[to_key] > 1)
+        seen_keys = Counter()
+        from_keys = [from_key for from_key in self._renames]
+        for from_key in from_keys:
+            to_key = self._renames[from_key]
+            if to_key in dup_keys:
+                
+                seen_keys[to_key] += 1
+
+    
     def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
+        author_field = entry.fields_dict.get("author", None)
+        year_field = entry.fields_dict.get("year", None)
+        title_field = entry.fields_dict.get("title", None)
+        if author_field is None:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        if year_field is None:
+            log("Cannot format key for yearless entry: " + entry.key)
+            return entry
+        author_list = author_field.value
+        if author_list == []:
+            log("Cannot format key for authorless entry: " + entry.key)
+            return entry
+        first_author: NameParts = author_list[0]
+        year = year_field.value
+        raw_key = "".join(first_author.von + first_author.last).lower() + year
+        messy_key = latexdecode(raw_key)
+        key = unidecode(messy_key)
+        # check whether this key is a duplicate
+        if entry.key in self._mapping:
+            self._duplicates.add(entry.key)
+            log("Not renaming duplicate key: " + entry.key)
+        else:
+            self._mapping[entry.key] = (key, title_field.value)
+        return super().transform_entry(entry, library)
+
+class RenameKeysTransformer(BlockMiddleware):
+    def __init__(self, root: str, renames: dict[str, str]):
+        self._root = root
+        self._renames = renames
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "RenameKeysTransformer"
+
+    def transform(self, library: Library) -> Library:
+        result = super().transform(library)
+        files = get_tex_files(self._root)
+        for file in files:
+            replace_in_file(file, self._renames)
+        return result
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
         author_field = entry.fields_dict.get("author", None)
         year_field = entry.fields_dict.get("year", None)
         if author_field is None:
@@ -366,13 +448,18 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
         raw_key = "".join(first_author.von + first_author.last).lower() + year
         messy_key = latexdecode(raw_key)
         key = unidecode(messy_key)
-        # check whether this key is a duplicate
-        if entry.key in self._renames:
-            self._duplicate_keys = entry.key
-            log("Not renaming duplicate key: ")
+        if entry.key in self._replacements:
+            log("Not replacing duplicate key: ")
+            return entry
+        # append suffix to key if needed
+        if key in self._new_keys:
+            new_key = key + chr(self._new_keys[key] + ord('a'))
         else:
-            self._renames[entry.key] = key
-        return super().transform_entry(entry, library)
+            new_key = key
+        # add the short key to the counter
+        self._new_keys[key] += 1
+        self._replacements[entry.key] = new_key
+        return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
 
 class FormatKeysMiddleware(BlockMiddleware):
     def __init__(self, root: str):
