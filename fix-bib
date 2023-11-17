@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Collection, Mapping, Optional, TypeVar
+from typing import Any, Collection, Mapping, Optional, TypeVar, Union
 import argparse
 import os
 import shutil
@@ -186,8 +186,9 @@ class FormatNamesTransformer(BlockMiddleware):
             return set_field(entry, "author", new_author_list)
 
 class FilterUsedTransformer(BlockMiddleware):
-    def __init__(self, root):
+    def __init__(self, *, root: str, preserved: set[str]):
         self._tex_files = get_tex_files(root)
+        self._preserved = preserved
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -195,6 +196,9 @@ class FilterUsedTransformer(BlockMiddleware):
         return "FilterUsedTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block | None:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
         if any(file_contains(file_name, entry.key) for file_name in self._tex_files):
             return entry
         else:
@@ -222,8 +226,9 @@ class OrderFieldTransformer(BlockMiddleware):
         )
 
 class FilterFieldTransformer(BlockMiddleware):
-    def __init__(self, map):
+    def __init__(self, *, map, preserved: set[str]):
         self._map = map
+        self._preserved = preserved
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -231,6 +236,10 @@ class FilterFieldTransformer(BlockMiddleware):
         return "FilterOrderFieldTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         keys = self._map.get(entry.entry_type, None)
         if keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
@@ -244,8 +253,9 @@ class FilterFieldTransformer(BlockMiddleware):
             )
 
 class TodoFieldTransformer(BlockMiddleware):
-    def __init__(self, map):
+    def __init__(self, map, preserved: set[str]):
         self._map = map
+        self._preserved = preserved
         self._allow_inplace_modification = True
     
     @staticmethod
@@ -253,6 +263,10 @@ class TodoFieldTransformer(BlockMiddleware):
         return "TodoFieldTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         keys = self._map.get(entry.entry_type, None)
         if keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
@@ -269,8 +283,9 @@ class TodoFieldTransformer(BlockMiddleware):
             )
 
 class LookupDoiTransformer(BlockMiddleware):
-    def __init__(self, *, browserless: bool):
+    def __init__(self, *, browserless: bool, preserved: set[str]):
         self._browserless = browserless
+        self._preserved = preserved
         self._allow_inplace_modification = True
     
     @staticmethod
@@ -278,6 +293,10 @@ class LookupDoiTransformer(BlockMiddleware):
         return "LookupDoiTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         doi = entry.fields_dict.get("doi", None)
         if doi is not None:
             return entry
@@ -311,15 +330,20 @@ class LookupDoiTransformer(BlockMiddleware):
                     return set_field(entry, "doi", doi_string)
 
 class LookupCitationTransformer(BlockMiddleware):
-    def __init__(self, *, clobber: bool):
+    def __init__(self, *, clobber: bool, preserved: set[str]):
         self._clobber = clobber
         self._allow_inplace_modification = True
+        self._preserved = preserved
 
     @staticmethod
     def metadata_key():
         return "LookupFieldsTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         doi = entry.fields_dict.get("doi", None)
         if doi is None:
             log("Cannot look up citation for DOIless entry: " + entry.key)
@@ -446,6 +470,45 @@ class RenameKeysTransformer(BlockMiddleware):
         new_key = self._renames.get(entry.key, entry.key)
         return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
 
+class GatherPreservedVisitor(BlockMiddleware):
+    def __init__(self, preserved: set[str]):
+        self._allow_inplace_modification = True
+        self._preserved = preserved
+    
+    def transform_explicit_comment(self, explicit_comment: ExplicitComment, library: Library) -> Block | Collection[Block] | None:
+        words = explicit_comment.comment.split()
+        if words[:2] == ["fix-bib", "preserve"]:
+            for key in words[2:]:
+                self._preserved.add(key)
+        return explicit_comment
+
+class SetPreservedTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+        self._preserved: list[str] = []
+
+    @staticmethod
+    def metadata_key():
+        return "SetPreservedTransformer"
+
+    def transform(self, library: Library) -> Library:
+        res = super().transform(library)
+        comment = "fix-bib preserve\n  " + "\n  ".join(sorted(list(self._preserved))) + "\n"
+        res.add(ExplicitComment(comment))
+        return res
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
+        self._preserved.append(entry.key)
+        return entry
+
+    def transform_explicit_comment(self, explicit_comment: ExplicitComment, library: Library) -> None:
+        # remove any existing preservation comment
+        words = explicit_comment.comment.split()
+        if words[:2] == ["fix-bib", "preserve"]:
+            return None
+        else:
+            return explicit_comment
+
 def main():
     parser = argparse.ArgumentParser(
         description="Clean up a BibTeX file according to Flix contributor conventions."
@@ -458,6 +521,7 @@ def main():
     parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
+    parser.add_argument("-p", "--preserve", action="store_true", help="preserve entry modifications")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
     parser.add_argument("-s", "--sort", action="store_true", help="sort entries by key")
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
@@ -485,16 +549,18 @@ def main():
     db = bibtexparser.parse_file(bib_file_name)
 
     middleware = []
+    preserved = set()
+    middleware.append(GatherPreservedVisitor(preserved))
     if args.unused:
-        middleware.append(FilterUsedTransformer(root))
+        middleware.append(FilterUsedTransformer(preserved=preserved, root=root))
     if args.interactive:
         middleware.append(LookupDoiTransformer(browserless=args.browserless))
     if args.lookup:
-        middleware.append(LookupCitationTransformer(clobber=args.replace))
+        middleware.append(LookupCitationTransformer(clobber=args.replace, preserved=preserved))
     if args.filter:
-        middleware.append(FilterFieldTransformer(FIELD_MAP))
+        middleware.append(FilterFieldTransformer(map=FIELD_MAP, preserved=preserved))
     if args.todo:
-        middleware.append(TodoFieldTransformer(FIELD_MAP))
+        middleware.append(TodoFieldTransformer(map=FIELD_MAP, preserved=preserved))
     if args.names:
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
@@ -505,6 +571,7 @@ def main():
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
         renames = {}
+        # TODO probably need to do something particular here for renaming...
         middleware.append(GatherKeyRenamesVisitor(renames))
         middleware.append(RenameKeysTransformer(root, renames))
         middleware.append(MergeNameParts())
@@ -513,6 +580,8 @@ def main():
         middleware.append(OrderFieldTransformer(FIELD_ORDER))
         middleware.append(RemoveImplicitCommentsTransformer())
         middleware.append(SortBlocksByTypeAndKeyMiddleware(BLOCK_TYPE_ORDER))
+    if args.preserve:
+        middleware.append(SetPreservedTransformer())
 
     bib_format = BibtexFormat()
     bib_format.indent = "  "
