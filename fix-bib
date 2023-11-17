@@ -356,7 +356,7 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
         # old key -> new key
         self._renames = renames
         # old key -> (unindexed new key, title)
-        self._mapping: dict[str, (str, str)]
+        self._mapping: dict[str, (str, str)] = {}
         self._duplicates: set[str] = set()
         self._allow_inplace_modification = True
     
@@ -375,7 +375,7 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
 
         # invert the mapping
         # new key -> set((old key, title))
-        new_to_old = defaultdict(default_factory = list)
+        new_to_old = defaultdict(list)
         for old_key, (new_key, title) in self._mapping.items():
             new_to_old[new_key].append((old_key, title))
         
@@ -392,7 +392,10 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
             else:
                 indices = iter(string.ascii_lowercase)
                 for old_key, _ in old_list:
-                    string._renames[old_key] = new_key + next(indices)
+                    self._renames[old_key] = new_key + next(indices)
+
+        # return the library unchanged
+        return library
     
     def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
         author_field = entry.fields_dict.get("author", None)
