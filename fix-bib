@@ -4,8 +4,9 @@ import argparse
 import os
 import shutil
 import webbrowser
-from collections import Counter
+from collections import Counter, defaultdict
 from tempfile import TemporaryDirectory
+import string
 import re
 
 
@@ -355,7 +356,7 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
         # old key -> new key
         self._renames = renames
         # old key -> (unindexed new key, title)
-        self._mapping: set[str, (str, str)]
+        self._mapping: dict[str, (str, str)]
         self._duplicates: set[str] = set()
         self._allow_inplace_modification = True
     
@@ -367,24 +368,31 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
         # run the visitor over the entries
         super().transform(library)
 
-        # then remove duplicates
+        # remove duplicates
         for duplicate in self._duplicates:
+            # TODO log
             del self._renames[duplicate]
 
-        # then disambiguate the renames
-        new_to_old = invert_dict(self._mapping)
-        # TODO not right...
-
-        to_keys = Counter(self._renames.values)
-        dup_keys = set(to_key for to_key in to_keys if to_keys[to_key] > 1)
-        seen_keys = Counter()
-        from_keys = [from_key for from_key in self._renames]
-        for from_key in from_keys:
-            to_key = self._renames[from_key]
-            if to_key in dup_keys:
-                
-                seen_keys[to_key] += 1
-
+        # invert the mapping
+        # new key -> set((old key, title))
+        new_to_old = defaultdict(default_factory = list)
+        for old_key, (new_key, title) in self._mapping.items():
+            new_to_old[new_key].append((old_key, title))
+        
+        # sort the old key list by title
+        for _, old_list in new_to_old.items():
+            old_list.sort(key = lambda pair: pair[1])
+        
+        # make the final mapping with indexed keys
+        # old key -> new indexed key
+        for new_key, old_list in new_to_old.items():
+            if len(old_list) == 1:
+                old_key, _ = old_list[0]
+                self._renames[old_key] = new_key
+            else:
+                indices = iter(string.ascii_lowercase)
+                for old_key, _ in old_list:
+                    string._renames[old_key] = new_key + next(indices)
     
     def transform_entry(self, entry: Entry, library: Library) -> Block | Collection[Block] | None:
         author_field = entry.fields_dict.get("author", None)
