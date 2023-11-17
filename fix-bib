@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any, Collection, Mapping, Optional, TypeVar
+from typing import Any, Collection, Mapping, Optional, TypeVar, Union
 import argparse
 import os
 import shutil
@@ -446,6 +446,45 @@ class RenameKeysTransformer(BlockMiddleware):
         new_key = self._renames.get(entry.key, entry.key)
         return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
 
+class GatherPreservedVisitor(BlockMiddleware):
+    def __init__(self, preserved: set[str]):
+        self._allow_inplace_modification = True
+        self._preserved = preserved
+    
+    def transform_explicit_comment(self, explicit_comment: ExplicitComment, library: Library) -> Block | Collection[Block] | None:
+        words = explicit_comment.comment.split()
+        if words[:2] == ["fix-bib", "preserve"]:
+            for key in words[2:]:
+                self._preserved.add(key)
+        return explicit_comment
+
+class SetPreservedTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+        self._preserved: list[str] = []
+
+    @staticmethod
+    def metadata_key():
+        return "SetPreservedTransformer"
+
+    def transform(self, library: Library) -> Library:
+        res = super().transform(library)
+        comment = "fix-bib preserve\n  " + "\n  ".join(sorted(list(self._preserved))) + "\n"
+        res.add(ExplicitComment(comment))
+        return res
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Block:
+        self._preserved.append(entry.key)
+        return entry
+
+    def transform_explicit_comment(self, explicit_comment: ExplicitComment, library: Library) -> None:
+        # remove any existing preservation comment
+        words = explicit_comment.comment.split()
+        if words[:2] == ["fix-bib", "preserve"]:
+            return None
+        else:
+            return explicit_comment
+
 def main():
     parser = argparse.ArgumentParser(
         description="Clean up a BibTeX file according to Flix contributor conventions."
@@ -458,6 +497,7 @@ def main():
     parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
+    parser.add_argument("-p", "--preserve", action="store_true", help="preserve entry modifications")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
     parser.add_argument("-s", "--sort", action="store_true", help="sort entries by key")
     parser.add_argument("-t", "--todo", action="store_true", help="mark required fields with TODO")
@@ -485,6 +525,7 @@ def main():
     db = bibtexparser.parse_file(bib_file_name)
 
     middleware = []
+    preserved = set()
     if args.unused:
         middleware.append(FilterUsedTransformer(root))
     if args.interactive:
@@ -513,6 +554,8 @@ def main():
         middleware.append(OrderFieldTransformer(FIELD_ORDER))
         middleware.append(RemoveImplicitCommentsTransformer())
         middleware.append(SortBlocksByTypeAndKeyMiddleware(BLOCK_TYPE_ORDER))
+    if args.preserve:
+        middleware.append(SetPreservedTransformer())
 
     bib_format = BibtexFormat()
     bib_format.indent = "  "
