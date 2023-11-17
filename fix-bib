@@ -186,8 +186,9 @@ class FormatNamesTransformer(BlockMiddleware):
             return set_field(entry, "author", new_author_list)
 
 class FilterUsedTransformer(BlockMiddleware):
-    def __init__(self, root):
+    def __init__(self, *, root: str, preserved: set[str]):
         self._tex_files = get_tex_files(root)
+        self._preserved = preserved
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -195,6 +196,9 @@ class FilterUsedTransformer(BlockMiddleware):
         return "FilterUsedTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block | None:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
         if any(file_contains(file_name, entry.key) for file_name in self._tex_files):
             return entry
         else:
@@ -222,8 +226,9 @@ class OrderFieldTransformer(BlockMiddleware):
         )
 
 class FilterFieldTransformer(BlockMiddleware):
-    def __init__(self, map):
+    def __init__(self, *, map, preserved: set[str]):
         self._map = map
+        self._preserved = preserved
         self._allow_inplace_modification = True
 
     @staticmethod
@@ -231,6 +236,10 @@ class FilterFieldTransformer(BlockMiddleware):
         return "FilterOrderFieldTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         keys = self._map.get(entry.entry_type, None)
         if keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
@@ -244,8 +253,9 @@ class FilterFieldTransformer(BlockMiddleware):
             )
 
 class TodoFieldTransformer(BlockMiddleware):
-    def __init__(self, map):
+    def __init__(self, map, preserved: set[str]):
         self._map = map
+        self._preserved = preserved
         self._allow_inplace_modification = True
     
     @staticmethod
@@ -253,6 +263,10 @@ class TodoFieldTransformer(BlockMiddleware):
         return "TodoFieldTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         keys = self._map.get(entry.entry_type, None)
         if keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
@@ -269,8 +283,9 @@ class TodoFieldTransformer(BlockMiddleware):
             )
 
 class LookupDoiTransformer(BlockMiddleware):
-    def __init__(self, *, browserless: bool):
+    def __init__(self, *, browserless: bool, preserved: set[str]):
         self._browserless = browserless
+        self._preserved = preserved
         self._allow_inplace_modification = True
     
     @staticmethod
@@ -278,6 +293,10 @@ class LookupDoiTransformer(BlockMiddleware):
         return "LookupDoiTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         doi = entry.fields_dict.get("doi", None)
         if doi is not None:
             return entry
@@ -311,15 +330,20 @@ class LookupDoiTransformer(BlockMiddleware):
                     return set_field(entry, "doi", doi_string)
 
 class LookupCitationTransformer(BlockMiddleware):
-    def __init__(self, *, clobber: bool):
+    def __init__(self, *, clobber: bool, preserved: set[str]):
         self._clobber = clobber
         self._allow_inplace_modification = True
+        self._preserved = preserved
 
     @staticmethod
     def metadata_key():
         return "LookupFieldsTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        # skip if this entry is preserved
+        if entry.key in self._preserved:
+            return entry
+
         doi = entry.fields_dict.get("doi", None)
         if doi is None:
             log("Cannot look up citation for DOIless entry: " + entry.key)
@@ -526,16 +550,17 @@ def main():
 
     middleware = []
     preserved = set()
+    middleware.append(GatherPreservedVisitor(preserved))
     if args.unused:
-        middleware.append(FilterUsedTransformer(root))
+        middleware.append(FilterUsedTransformer(preserved=preserved, root=root))
     if args.interactive:
         middleware.append(LookupDoiTransformer(browserless=args.browserless))
     if args.lookup:
-        middleware.append(LookupCitationTransformer(clobber=args.replace))
+        middleware.append(LookupCitationTransformer(clobber=args.replace, preserved=preserved))
     if args.filter:
-        middleware.append(FilterFieldTransformer(FIELD_MAP))
+        middleware.append(FilterFieldTransformer(map=FIELD_MAP, preserved=preserved))
     if args.todo:
-        middleware.append(TodoFieldTransformer(FIELD_MAP))
+        middleware.append(TodoFieldTransformer(map=FIELD_MAP, preserved=preserved))
     if args.names:
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
@@ -546,6 +571,7 @@ def main():
         middleware.append(SeparateCoAuthors())
         middleware.append(SplitNameParts())
         renames = {}
+        # TODO probably need to do something particular here for renaming...
         middleware.append(GatherKeyRenamesVisitor(renames))
         middleware.append(RenameKeysTransformer(root, renames))
         middleware.append(MergeNameParts())
