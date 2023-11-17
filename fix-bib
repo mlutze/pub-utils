@@ -4,7 +4,7 @@ import argparse
 import os
 import shutil
 import webbrowser
-from collections import Counter, defaultdict
+from collections import defaultdict
 from tempfile import TemporaryDirectory
 import string
 import re
@@ -444,55 +444,6 @@ class RenameKeysTransformer(BlockMiddleware):
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         # TODO log
         new_key = self._renames.get(entry.key, entry.key)
-        return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
-
-class FormatKeysMiddleware(BlockMiddleware):
-    def __init__(self, root: str):
-        self._root = root
-        self._allow_inplace_modification = True
-        self._replacements = {}
-        self._new_keys = Counter()
-
-    @staticmethod
-    def metadata_key():
-        return "FormatKeysMiddleware"
-
-    def transform(self, library: Library) -> Library:
-        result = super().transform(library)
-        files = get_tex_files(self._root)
-        for file in files:
-            replace_in_file(file, self._replacements)
-        return result
-    
-    def transform_entry(self, entry: Entry, library: Library) -> Block:
-        author_field = entry.fields_dict.get("author", None)
-        year_field = entry.fields_dict.get("year", None)
-        if author_field is None:
-            log("Cannot format key for authorless entry: " + entry.key)
-            return entry
-        if year_field is None:
-            log("Cannot format key for yearless entry: " + entry.key)
-            return entry
-        author_list = author_field.value
-        if author_list == []:
-            log("Cannot format key for authorless entry: " + entry.key)
-            return entry
-        first_author: NameParts = author_list[0]
-        year = year_field.value
-        raw_key = "".join(first_author.von + first_author.last).lower() + year
-        messy_key = latexdecode(raw_key)
-        key = unidecode(messy_key)
-        if entry.key in self._replacements:
-            log("Not replacing duplicate key: ")
-            return entry
-        # append suffix to key if needed
-        if key in self._new_keys:
-            new_key = key + chr(self._new_keys[key] + ord('a'))
-        else:
-            new_key = key
-        # add the short key to the counter
-        self._new_keys[key] += 1
-        self._replacements[entry.key] = new_key
         return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
 
 def main():
