@@ -446,6 +446,18 @@ class RenameKeysTransformer(BlockMiddleware):
         new_key = self._renames.get(entry.key, entry.key)
         return Entry(entry_type=entry.entry_type, key=new_key, fields=entry.fields)
 
+class LowerFieldsTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "LowerFieldsTransformer"
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Entry:
+        new_fields = [Field(field.key.lower(), field.value) for field in entry.fields]
+        return Entry(entry.entry_type, entry.key, new_fields)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Clean up a BibTeX file according to Flix contributor conventions."
@@ -485,6 +497,7 @@ def main():
     db = bibtexparser.parse_file(bib_file_name)
 
     middleware = []
+    middleware.append(LowerFieldsTransformer())
     if args.unused:
         middleware.append(FilterUsedTransformer(root))
     if args.interactive:

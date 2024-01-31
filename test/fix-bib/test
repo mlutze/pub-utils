@@ -15,6 +15,11 @@ echo "Testing $name"
 $root/fix-bib -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
 
+name="test-noargs-3"
+echo "Testing $name"
+$root/fix-bib -o "$tmpfile" "input/$name.bib"
+diff "$tmpfile" "expected/$name.bib"
+
 name="test-sort-1"
 echo "Testing $name"
 $root/fix-bib -s -o "$tmpfile" "input/$name.bib"
