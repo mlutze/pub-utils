@@ -497,13 +497,13 @@ def main():
     db = bibtexparser.parse_file(bib_file_name)
 
     middleware = []
-    middleware.append(LowerFieldsTransformer())
     if args.unused:
         middleware.append(FilterUsedTransformer(root))
     if args.interactive:
         middleware.append(LookupDoiTransformer(browserless=args.browserless))
     if args.lookup:
         middleware.append(LookupCitationTransformer(clobber=args.replace))
+    middleware.append(LowerFieldsTransformer())
     if args.filter:
         middleware.append(FilterFieldTransformer(FIELD_MAP))
     if args.todo:
