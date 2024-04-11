@@ -5,6 +5,8 @@ import os
 import shutil
 import webbrowser
 from collections import defaultdict
+import requests
+from collections import Counter
 from tempfile import TemporaryDirectory
 import string
 import re
@@ -325,10 +327,12 @@ class LookupCitationTransformer(BlockMiddleware):
             log("Cannot look up citation for DOIless entry: " + entry.key)
             return entry
         else:
-            crossref_bibtex = cn.content_negotiation(doi.value)
-            if crossref_bibtex is None:
-                log("Not modifying entry with invalid doi:" + entry.key)
-                return entry
+            try:
+                crossref_bibtex = cn.content_negotiation(doi.value)
+            except requests.HTTPError as e:
+                if e.errno == 404:
+                    log("Not modifying entry with invalid doi:" + entry.key)
+                    return entry
             crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
             if self._clobber:
                 return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
