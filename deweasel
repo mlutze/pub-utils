@@ -10,7 +10,7 @@ touch dict/weasels
 
 weasels=$(cat dict/weasels | grep -v '#' | tr '\n' '|' | awk '{ print(substr($0, 1, length($0) - 1)) }')
 
-if [ -z "$weasel" ]; then
+if [ -z "$weasels" ]; then
     >&2 echo "Error: dict/weasels file empty"
     exit 1
 fi
