@@ -15,6 +15,6 @@ if [ -z "$rats" ]; then
     exit 1
 fi
 
-grep -E -i -n --color "$rats" "$@"
+pcregrep -M -i -n --color "$rats" "$@"
 
 exit $?
