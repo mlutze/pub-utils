@@ -96,7 +96,7 @@ def file_contains(file_name: str, string: str) -> bool:
 def multiple_replace(text: str, mapping: Mapping[str, str]) -> str:
   """Replace strings in the text according to the dictionary."""
   # https://code.activestate.com/recipes/81330-single-pass-multiple-replace/
-  regex = re.compile("(%s)" % "|".join(map(re.escape, mapping.keys())))
+  regex = re.compile("\\b(%s)\\b" % "|".join(map(re.escape, mapping.keys())))
   return regex.sub(lambda mo: mapping[mo.string[mo.start():mo.end()]], text) 
         
 def replace_in_file(file_name: str, mapping: Mapping[str, str]) -> None:
