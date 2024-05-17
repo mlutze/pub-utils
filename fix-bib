@@ -52,7 +52,8 @@ FIELD_MAP = {
     "phdthesis": sorted(["title", "author", "year", "school", "doi"], key=FIELD_ORDER.index),
     "inproceedings": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index),
     "techreport": sorted(["title", "author", "institution", "year", "doi"], key=FIELD_ORDER.index),
-    "book": sorted(["title", "author", "volume", "year", "publisher", "doi"], key=FIELD_ORDER.index),
+    "book": sorted(["title", "author", "volume", "year", "publisher", "isbn"], key=FIELD_ORDER.index),
+    "inbook": sorted(["title", "author", "booktitle", "year", "publisher", "isbn", "doi"], key=FIELD_ORDER.index),
     "incollection": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index)
 }
 
