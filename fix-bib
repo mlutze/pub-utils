@@ -36,6 +36,7 @@ BLOCK_TYPE_ORDER = (ExplicitComment, String, Preamble, Entry, ImplicitComment)
 FIELD_ORDER = [
     "title",
     "author",
+    "booktitle",
     "journal",
     "booktitle",
     "institution",
@@ -44,6 +45,7 @@ FIELD_ORDER = [
     "year",
     "school",
     "publisher",
+    "isbn",
     "doi"
 ]
 
