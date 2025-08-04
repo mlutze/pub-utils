@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import shutil
+import sys
+import os
+import re
+from tempfile import TemporaryDirectory
+from typing import Mapping
+
+def get_tex_files(root: str) -> list[str]:
+    """Returns the list of TeX files under the given root directory."""
+    files: list[str] = []
+    for (dir_name, _, file_names) in os.walk(root):
+        for file_name in file_names:
+            if file_name.endswith(".tex"):
+                files.append(os.path.join(dir_name, file_name))
+            else:
+                pass
+    return files
+
+def multiple_replace(text: str, mapping: Mapping[str, str]) -> str:
+  """Replace strings in the text according to the dictionary."""
+  # https://code.activestate.com/recipes/81330-single-pass-multiple-replace/
+  regex = re.compile("(%s)(?![a-zA-Z])" % "|".join(map(re.escape, mapping.keys())))
+  return regex.sub(lambda mo: mapping[mo.string[mo.start():mo.end()]], text) 
+        
+def replace_in_file(file_name: str, mapping: Mapping[str, str]) -> None:
+    """Replaces text according to the mapping in the given file."""
+    with open(file_name) as file:
+        with TemporaryDirectory() as tmp_dir_name:
+            tmp_file_name = tmp_dir_name + "/" + "tmp.tex"
+            with open(tmp_file_name, "+w") as tmp_file:
+                for line in file:
+                    tmp_file.write(multiple_replace(line, mapping))
+            shutil.copyfile(tmp_file_name, file_name)
+
+
+
+
+prefix = sys.argv[1]
+
+# get all the newcommands
+macros = set()
+
+for file in get_tex_files("."):
+    with open(file) as handle:
+        for line in handle:
+            for macro in re.findall(r"\\newcommand\{\\([a-zA-Z]*?)\}", line):
+                macros.add(macro)
+
+# map macro to prefixed macro
+mapping = {}
+for macro in macros:
+    k = "\\" + macro
+    v = "\\" + prefix + macro
+    mapping[k] = v
+
+# execute the mapping
+for file in get_tex_files("."):
+    replace_in_file(file, mapping)
