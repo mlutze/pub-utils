@@ -45,7 +45,7 @@ labels = set()
 for file in get_tex_files("."):
     with open(file) as handle:
         for line in handle:
-            for label in re.findall(r"\\label\{([\w-]*?)\}", line):
+            for label in re.findall(r"\\label\{(.*?)\}", line):
                 labels.add(label)
 
 # map macro to prefixed macro
@@ -53,6 +53,9 @@ mapping = {}
 for label in labels:
     k = "\\ref{" + label + "}"
     v = "\\ref{" + prefix + label + "}"
+    mapping[k] = v
+    k = "\\label{" + label + "}"
+    v = "\\label{" + prefix + label + "}"
     mapping[k] = v
 
 # execute the mapping
