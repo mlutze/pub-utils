@@ -48,15 +48,13 @@ for file in get_tex_files("."):
             for label in re.findall(r"\\label\{(.*?)\}", line):
                 labels.add(label)
 
-# map macro to prefixed macro
+# map label to prefixed label
 mapping = {}
 for label in labels:
-    k = "\\ref{" + label + "}"
-    v = "\\ref{" + prefix + label + "}"
-    mapping[k] = v
-    k = "\\label{" + label + "}"
-    v = "\\label{" + prefix + label + "}"
-    mapping[k] = v
+    for command in ["ref", "cref", "Cref", "label"]:
+        k = "\\" + command + "{" + label + "}"
+        v = "\\" + command + "{" + prefix + label + "}"
+        mapping[k] = v
 
 # execute the mapping
 for file in get_tex_files("."):
