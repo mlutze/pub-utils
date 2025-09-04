@@ -45,7 +45,11 @@ macros = set()
 for file in get_tex_files("."):
     with open(file) as handle:
         for line in handle:
+            # handle \newcommand{\foo}
             for macro in re.findall(r"\\newcommand\{\\([a-zA-Z]*?)\}", line):
+                macros.add(macro)
+            # handle \newcommand\foo
+            for macro in re.findall(r"\\newcommand\\([a-zA-Z]+?)\b", line):
                 macros.add(macro)
 
 # map macro to prefixed macro
