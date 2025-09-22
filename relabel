@@ -50,10 +50,19 @@ for file in get_tex_files("."):
 
 # map label to prefixed label
 mapping = {}
+
+keywords = [
+    "Cref",
+    "cref",
+    "label",
+    "mdref",
+    "ref",
+]
+
 for label in labels:
-    for command in ["ref", "cref", "Cref", "label"]:
-        k = "\\" + command + "{" + label + "}"
-        v = "\\" + command + "{" + prefix + label + "}"
+    for keyword in keywords:
+        k = "\\" + keyword + "{" + label + "}"
+        v = "\\" + keyword + "{" + prefix + label + "}"
         mapping[k] = v
 
 # execute the mapping
