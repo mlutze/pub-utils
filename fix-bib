@@ -421,6 +421,9 @@ class GatherKeyRenamesVisitor(BlockMiddleware):
         year = year_field.value
         raw_key = "".join(first_author.von + first_author.last).lower() + year
         messy_key = latexdecode(raw_key)
+        if messy_key is None:
+            log("Not renaming non-decodable key: " + raw_key)
+            messy_key = raw_key
         key = unidecode(messy_key)
         # check whether this key is a duplicate
         if entry.key in self._mapping:
