@@ -112,3 +112,8 @@ name="test-replace-2"
 echo "Testing $name"
 $root/fix-bib -lr -o "$tmpfile" "input/$name.bib"
 diff "$tmpfile" "expected/$name.bib"
+
+name="test-mark-1"
+echo "Testing $name"
+$root/fix-bib -m -o "$tmpfile" "input/$name.bib"
+diff "$tmpfile" "expected/$name.bib"
