@@ -36,7 +36,6 @@ BLOCK_TYPE_ORDER = (ExplicitComment, String, Preamble, Entry, ImplicitComment)
 FIELD_ORDER = [
     "title",
     "author",
-    "booktitle",
     "journal",
     "booktitle",
     "institution",
@@ -56,8 +55,8 @@ FIELD_MAP = {
     "phdthesis": (sorted(["title", "author", "year", "school", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
     "inproceedings": (sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
     "techreport": (sorted(["title", "author", "institution", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
-    "book": (sorted(["title", "author", "volume", "year", "publisher", "isbn"], key=FIELD_ORDER.index), ["fixbib"]),
-    "inbook": (sorted(["title", "author", "booktitle", "year", "publisher", "isbn", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "book": (sorted(["title", "author", "volume", "year", "publisher", "isbn"], key=FIELD_ORDER.index), ["doi", "fixbib"]),
+    "inbook": (sorted(["title", "author", "booktitle", "year", "publisher", "isbn"], key=FIELD_ORDER.index), ["doi", "fixbib"]),
     "incollection": (sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"])
 }
 
