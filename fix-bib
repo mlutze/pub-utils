@@ -50,14 +50,15 @@ FIELD_ORDER = [
     "fixbib"
 ]
 
+# entry type -> (required, optional)
 FIELD_MAP = {
-    "article": sorted(["title", "author", "journal", "volume", "number", "year", "doi", "fixbib"], key=FIELD_ORDER.index),
-    "phdthesis": sorted(["title", "author", "year", "school", "doi", "fixbib"], key=FIELD_ORDER.index),
-    "inproceedings": sorted(["title", "author", "booktitle", "year", "doi", "fixbib"], key=FIELD_ORDER.index),
-    "techreport": sorted(["title", "author", "institution", "year", "doi", "fixbib"], key=FIELD_ORDER.index),
-    "book": sorted(["title", "author", "volume", "year", "publisher", "isbn", "fixbib"], key=FIELD_ORDER.index),
-    "inbook": sorted(["title", "author", "booktitle", "year", "publisher", "isbn", "doi", "fixbib"], key=FIELD_ORDER.index),
-    "incollection": sorted(["title", "author", "booktitle", "year", "doi", "fixbib"], key=FIELD_ORDER.index)
+    "article": (sorted(["title", "author", "journal", "volume", "number", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "phdthesis": (sorted(["title", "author", "year", "school", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "inproceedings": (sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "techreport": (sorted(["title", "author", "institution", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "book": (sorted(["title", "author", "volume", "year", "publisher", "isbn"], key=FIELD_ORDER.index), ["fixbib"]),
+    "inbook": (sorted(["title", "author", "booktitle", "year", "publisher", "isbn", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "incollection": (sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"])
 }
 
 K = TypeVar('K')
@@ -247,12 +248,13 @@ class FilterFieldTransformer(BlockMiddleware):
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         if is_done(entry):
             return entry
-        keys = self._map.get(entry.entry_type, None)
-        if keys is None:
+        all_keys = self._map.get(entry.entry_type, None)
+        if all_keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
             return entry
         else:
-            new_fields = [field for field in entry.fields if field.key in keys]
+            required, optional = all_keys
+            new_fields = [field for field in entry.fields if field.key in required + optional]
             return Entry(
                 entry_type=entry.entry_type,
                 key=entry.key,
@@ -271,13 +273,14 @@ class TodoFieldTransformer(BlockMiddleware):
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         if is_done(entry):
             return entry
-        keys = self._map.get(entry.entry_type, None)
-        if keys is None:
+        all_keys = self._map.get(entry.entry_type, None)
+        if all_keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
             return entry
         else:
+            required, _optional = all_keys
             present_keys = set(entry.fields_dict.keys())
-            missing_keys = [key for key in keys if key not in present_keys]
+            missing_keys = [key for key in required if key not in present_keys]
             missing_fields = [Field(key, "TODO") for key in missing_keys]
             new_fields = entry.fields + missing_fields
             return Entry(
