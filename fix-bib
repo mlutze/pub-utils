@@ -345,20 +345,21 @@ class LookupCitationTransformer(BlockMiddleware):
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         if is_done(entry):
             return entry
-        doi = entry.fields_dict.get("doi", None)
-        if doi is None:
+        doi_field = entry.fields_dict.get("doi", None)
+        if doi_field is None:
             log("Cannot look up citation for DOIless entry: " + entry.key)
             return entry
         else:
+            doi = doi_field.value
             try:
-                crossref_bibtex = cn.content_negotiation(doi.value)
+                crossref_bibtex = cn.content_negotiation(doi)
             except requests.exceptions.HTTPError:
                 log("Not modifying entry with invalid doi: " + entry.key)
                 return entry
             try:
                 crossref_entries = bibtexparser.parse_string(crossref_bibtex)
             except:
-                log("error parsing crossref entry for entry: " + entry + " with doi: " + doi)
+                log("error parsing crossref entry for entry: " + entry.key + " with doi: " + doi)
                 return entry
             if len(crossref_entries.entries) == 0:
                 log("no entry found for entry: " + entry.key + " with doi: " + doi)
