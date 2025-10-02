@@ -46,17 +46,19 @@ FIELD_ORDER = [
     "school",
     "publisher",
     "isbn",
-    "doi"
+    "doi",
+    "fixbib"
 ]
 
+# entry type -> (required, optional)
 FIELD_MAP = {
-    "article": sorted(["title", "author", "journal", "volume", "number", "year", "doi"], key=FIELD_ORDER.index),
-    "phdthesis": sorted(["title", "author", "year", "school", "doi"], key=FIELD_ORDER.index),
-    "inproceedings": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index),
-    "techreport": sorted(["title", "author", "institution", "year", "doi"], key=FIELD_ORDER.index),
-    "book": sorted(["title", "author", "volume", "year", "publisher", "isbn"], key=FIELD_ORDER.index),
-    "inbook": sorted(["title", "author", "booktitle", "year", "publisher", "isbn", "doi"], key=FIELD_ORDER.index),
-    "incollection": sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index)
+    "article": (sorted(["title", "author", "journal", "volume", "number", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "phdthesis": (sorted(["title", "author", "year", "school", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "inproceedings": (sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "techreport": (sorted(["title", "author", "institution", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "book": (sorted(["title", "author", "volume", "year", "publisher", "isbn"], key=FIELD_ORDER.index), ["fixbib"]),
+    "inbook": (sorted(["title", "author", "booktitle", "year", "publisher", "isbn", "doi"], key=FIELD_ORDER.index), ["fixbib"]),
+    "incollection": (sorted(["title", "author", "booktitle", "year", "doi"], key=FIELD_ORDER.index), ["fixbib"])
 }
 
 K = TypeVar('K')
@@ -171,6 +173,9 @@ def set_field(entry: Entry, key: str, value: Any) -> Entry:
         fields=new_fields
     )
 
+def is_done(entry: Entry) -> bool:
+    return entry.fields_dict.get("fixbib", None) == "done"
+
 class FormatNamesTransformer(BlockMiddleware):
     def __init__(self):
         self._allow_inplace_modification = True
@@ -180,6 +185,9 @@ class FormatNamesTransformer(BlockMiddleware):
         return "FormatNamesTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        if is_done(entry):
+            return entry
+
         author_field = entry.fields_dict.get("author", None)
         if author_field is None:
             return entry
@@ -218,6 +226,8 @@ class OrderFieldTransformer(BlockMiddleware):
         return OrderFieldTransformer(BlockMiddleware)
     
     def transform_entry(self, entry: Entry, library: Library) -> Library:
+        if is_done(entry):
+            return entry
         fields = entry.fields
         new_fields = sorted(fields, key=lambda f: self._indices.get(f.key, float("inf")))
         return Entry(
@@ -236,12 +246,15 @@ class FilterFieldTransformer(BlockMiddleware):
         return "FilterOrderFieldTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
-        keys = self._map.get(entry.entry_type, None)
-        if keys is None:
+        if is_done(entry):
+            return entry
+        all_keys = self._map.get(entry.entry_type, None)
+        if all_keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
             return entry
         else:
-            new_fields = [field for field in entry.fields if field.key in keys]
+            required, optional = all_keys
+            new_fields = [field for field in entry.fields if field.key in required + optional]
             return Entry(
                 entry_type=entry.entry_type,
                 key=entry.key,
@@ -258,13 +271,16 @@ class TodoFieldTransformer(BlockMiddleware):
         return "TodoFieldTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Block:
-        keys = self._map.get(entry.entry_type, None)
-        if keys is None:
+        if is_done(entry):
+            return entry
+        all_keys = self._map.get(entry.entry_type, None)
+        if all_keys is None:
             log("Not modifying unknown entry type: " + entry.entry_type)
             return entry
         else:
+            required, _optional = all_keys
             present_keys = set(entry.fields_dict.keys())
-            missing_keys = [key for key in keys if key not in present_keys]
+            missing_keys = [key for key in required if key not in present_keys]
             missing_fields = [Field(key, "TODO") for key in missing_keys]
             new_fields = entry.fields + missing_fields
             return Entry(
@@ -283,6 +299,8 @@ class LookupDoiTransformer(BlockMiddleware):
         return "LookupDoiTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        if is_done(entry):
+            return entry
         doi = entry.fields_dict.get("doi", None)
         if doi is not None:
             return entry
@@ -291,6 +309,7 @@ class LookupDoiTransformer(BlockMiddleware):
             title = entry.fields_dict.get("title", None)
             if title is None:
                 print("Cannot look up DOI for titleless entry: " + entry.key)
+                # TODO allow specifying DOI anyway
                 return entry
             else:
                 if not self._browserless:
@@ -325,6 +344,8 @@ class LookupCitationTransformer(BlockMiddleware):
         return "LookupFieldsTransformer"
 
     def transform_entry(self, entry: Entry, library: Library) -> Block:
+        if is_done(entry):
+            return entry
         doi = entry.fields_dict.get("doi", None)
         if doi is None:
             log("Cannot look up citation for DOIless entry: " + entry.key)
@@ -472,8 +493,24 @@ class LowerFieldsTransformer(BlockMiddleware):
         return "LowerFieldsTransformer"
     
     def transform_entry(self, entry: Entry, library: Library) -> Entry:
+        if is_done(entry):
+            return entry
         new_fields = [Field(field.key.lower(), field.value) for field in entry.fields]
         return Entry(entry.entry_type, entry.key, new_fields)
+
+class MarkDoneTransformer(BlockMiddleware):
+    def __init__(self):
+        self._allow_inplace_modification = True
+
+    @staticmethod
+    def metadata_key():
+        return "MarkDoneTransformer"
+    
+    def transform_entry(self, entry: Entry, library: Library) -> Entry:
+        if is_done(entry):
+            return entry
+        return set_field(entry, "fixbib", "done")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -485,6 +522,7 @@ def main():
     parser.add_argument("-i", "--interactive", action="store_true", help="run in interactive mode")
     parser.add_argument("-k", "--keys", action="store_true", help="modify entry keys")
     parser.add_argument("-l", "--lookup", action="store_true", help="look up citations via CrossRef")
+    parser.add_argument("-m", "--mark", action="store_true", help="mark transformed entries")
     parser.add_argument("-n", "--names", action="store_true", help="format author names")
     parser.add_argument("-o", "--output", action="store", help="specify an output file (default in-place)")
     parser.add_argument("-r", "--replace", action="store_true", help="replace existing fields with CrossRef fields")
@@ -539,6 +577,8 @@ def main():
         middleware.append(RenameKeysTransformer(root, renames))
         middleware.append(MergeNameParts())
         middleware.append(MergeCoAuthors())
+    if args.mark:
+        middleware.append(MarkDoneTransformer())
     if args.sort:
         middleware.append(OrderFieldTransformer(FIELD_ORDER))
         middleware.append(RemoveImplicitCommentsTransformer())
