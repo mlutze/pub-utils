@@ -357,14 +357,14 @@ class LookupCitationTransformer(BlockMiddleware):
                 log("Not modifying entry with invalid doi: " + entry.key)
                 return entry
             try:
-                crossref_entries = crossref_entry = bibtexparser.parse_string(crossref_bibtex)
+                crossref_entries = bibtexparser.parse_string(crossref_bibtex)
             except:
                 log("error parsing crossref entry for entry: " + entry + " with doi: " + doi)
                 return entry
-            if not crossref_entries:
+            if len(crossref_entries.entries) == 0:
                 log("no entry found for entry: " + entry.key + " with doi: " + doi)
                 return entry
-            crossref_entry = bibtexparser.parse_string(crossref_bibtex).entries[0]
+            crossref_entry = crossref_entries.entries[0]
             if self._clobber:
                 return Entry(crossref_entry.entry_type, entry.key, crossref_entry.fields)
             else:
